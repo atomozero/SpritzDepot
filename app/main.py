@@ -13,13 +13,15 @@ daemon this is a wishlist; with it, it's remote install.
 """
 from __future__ import annotations
 
+import secrets
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
 
 from .auth import current_user, hash_password, make_token, verify_password
+from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_git
 from .models import CichetoRow, InstallState, User
@@ -29,7 +31,31 @@ app = FastAPI(title="spritz registry", version="0.1.0")
 
 @app.on_event("startup")
 def _startup() -> None:
+    # Refuse to start with insecure config in prod (warns in dev).
+    check_prod_config()
     init_db()
+
+
+# ---------- admin guard ----------
+
+def require_admin(x_admin_token: Optional[str] = Header(default=None)) -> None:
+    """Gate admin-only endpoints behind a shared token.
+
+    The token is read from SPRITZ_ADMIN_TOKEN (app.config). If it is unset,
+    the endpoint is closed entirely (503) rather than open to anyone. The
+    comparison is timing-safe.
+    """
+    if not ADMIN_TOKEN:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Admin endpoint disabled: SPRITZ_ADMIN_TOKEN is not configured",
+        )
+    if not x_admin_token or not secrets.compare_digest(x_admin_token, ADMIN_TOKEN):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid or missing admin token",
+            headers={"WWW-Authenticate": "X-Admin-Token"},
+        )
 
 
 # ---------- request/response bodies ----------
@@ -229,9 +255,9 @@ class IngestBody(BaseModel):
     bacaro: str
 
 
-@app.post("/ingest")
+@app.post("/ingest", dependencies=[Depends(require_admin)])
 def ingest(body: IngestBody):
-    """Crawl a bàcaro git repo into the cache. (Add auth before exposing.)"""
+    """Crawl a bàcaro git repo into the cache. Admin-only (X-Admin-Token)."""
     try:
         return ingest_git(body.git_url, body.bacaro)
     except Exception as e:

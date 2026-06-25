@@ -24,6 +24,18 @@ uvicorn app.main:app --reload  # poi apri http://localhost:8000/docs
 ```
 
 `python test_flow.py` esercita l'intero flusso in-process senza rete.
+`python test_security.py` verifica il gate admin su `/ingest` e il blocco prod.
+
+## Variabili d'ambiente
+
+| Variabile | Default | A cosa serve |
+|---|---|---|
+| `SPRITZ_ENV` | `dev` | `dev` (fallback comodi, solo avvisi) o `prod` (gate attivo). |
+| `SPRITZ_SECRET` | dev fallback | Chiave di firma dei JWT. In `prod` è obbligatoria. |
+| `SPRITZ_ADMIN_TOKEN` | non impostata | Token per `/ingest` (header `X-Admin-Token`). Se manca, `/ingest` è chiuso (503), mai aperto. In `prod` è obbligatoria. |
+
+In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
+sono ancora il default di sviluppo. In `dev` parte ma logga un avviso.
 
 ## Struttura
 
@@ -50,7 +62,7 @@ sample-bacaro/ cichéto d'esempio (Genio)
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |
 | GET  | `/library` | "le mie app" (auth) |
-| POST | `/ingest` | crawl bàcaro (da proteggere) |
+| POST | `/ingest` | crawl bàcaro (admin, `X-Admin-Token`) |
 
 ## Prossimi passi (non in v1)
 
@@ -61,10 +73,13 @@ sample-bacaro/ cichéto d'esempio (Genio)
 4. **Tier di fiducia, firma manifest, transparency log** — fuori dal cichéto,
    asserzioni firmate dell'indice.
 5. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
-6. Auth sull'ingest, rate-limit, magic-link opzionale.
+6. Rate-limit (login, register, ingest), HTTPS/HSTS, magic-link opzionale.
 
-## Note di sicurezza già previste
+## Note di sicurezza
 
+- **`/ingest` è admin-only** (`X-Admin-Token`); chiuso se il token non è
+  configurato. La chiave JWT e il token admin vengono dall'ambiente, e in
+  `prod` l'app rifiuta di partire senza (vedi Variabili d'ambiente).
 - `sha256` obbligatorio sui canali pinned; verificato dal demone al download.
 - I canali `github-latest` non pre-calcolano l'hash: il demone verifica al volo
   e logga l'hash visto (trade-off accettabile per i soli nightly).

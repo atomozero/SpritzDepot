@@ -6,12 +6,14 @@ nice-to-have.
 
 ## Must fix before public
 
-- [ ] **Protect `/ingest`.** It is currently open. Require an admin token or
-      restrict to authenticated admin users. Ingest can pull arbitrary git
-      repos, so it must not be callable anonymously.
-- [ ] **SECRET_KEY.** Remove the `dev-only-change-me` default. Require
-      `SPRITZ_SECRET` from the environment and fail to start if it is missing
-      in non-dev mode. Never ship the default.
+- [x] **Protect `/ingest`.** Done. Admin-only via `SPRITZ_ADMIN_TOKEN`
+      (header `X-Admin-Token`), timing-safe compare. If the token is unset the
+      endpoint is closed (503), never anonymous. See `require_admin` in
+      `app/main.py`.
+- [x] **SECRET_KEY.** Done. `SPRITZ_SECRET` comes from the environment via
+      `app/config.py`. In `prod` mode (`SPRITZ_ENV=prod`) the app refuses to
+      start if `SPRITZ_SECRET` or `SPRITZ_ADMIN_TOKEN` is missing or still the
+      dev default; in `dev` it warns. Verified by `test_security.py`.
 - [ ] **Rate limiting.** At minimum on `/auth/login`, `/auth/register`, and
       `/ingest`. Use slowapi or equivalent. Prevents credential stuffing and
       ingest abuse.

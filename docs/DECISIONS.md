@@ -39,6 +39,23 @@ the broken layer. Do not reintroduce passlib.
 the schema and enforced by the proxy. Non-negotiable for stable; ombra verifies
 at download time and logs the seen hash (acceptable only for nightlies).
 
+**`/ingest` guarded by a shared admin token, not a User.is_admin flag.** Ingest
+is an operator action, not an end-user one, so a single `SPRITZ_ADMIN_TOKEN`
+(header `X-Admin-Token`, timing-safe compare) is enough and needs no schema
+migration. If unset, the endpoint is closed (503), never anonymous. Revisit if
+multiple distinct admins ever need separate, revocable credentials.
+
+**Secrets are env-driven with a prod startup gate.** `app/config.py` reads
+`SPRITZ_SECRET` and `SPRITZ_ADMIN_TOKEN`; `SPRITZ_ENV=prod` makes the app refuse
+to start if either is missing or still the dev default. `dev` keeps a fallback
+but warns. Dev fallback exists only so `seed.py` / `test_flow.py` run with no
+setup; it must never reach production, which the gate enforces.
+
+**Deferred from task 02 (not yet done):** rate limiting on `/auth/*` and
+`/ingest`, HTTPS-only + HSTS, and ingest input validation (git URL scheme,
+clone size/time caps). Tracked in `docs/tasks/02-security-hardening.md`; still
+required before the repo goes public.
+
 ## Open (resolve and record here)
 
 - **Does `package_repo` build for Linux/WSL?** Gates task 01. See SETUP-WSL.md.

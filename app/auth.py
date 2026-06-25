@@ -1,13 +1,12 @@
 """Email + password auth with JWT bearer tokens.
 
 Prototype-grade but real: bcrypt hashing, short-lived JWTs.
-For production, move SECRET_KEY to env and add refresh tokens.
+SECRET_KEY comes from app.config (env-driven, prod-gated). For production,
+also add refresh tokens / revocation (see docs/tasks/02-security-hardening.md).
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta
-from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -15,10 +14,10 @@ from jose import JWTError, jwt
 import bcrypt
 from sqlmodel import Session, select
 
+from .config import SECRET_KEY
 from .db import get_session
 from .models import User
 
-SECRET_KEY = os.environ.get("SPRITZ_SECRET", "dev-only-change-me")
 ALGORITHM = "HS256"
 TOKEN_TTL_MINUTES = 60 * 24 * 7  # a week
 
