@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+spritz.db
+*.log
+.env
+packages-cache/
+
+# Local tooling context and config (not part of the project)
+CLAUDE.md
+.claude/

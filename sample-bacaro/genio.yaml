@@ -1,0 +1,38 @@
+cicheto: 1
+id: org.haiku.genio
+name: Genio
+summary: IDE nativo per Haiku
+homepage: https://github.com/Genio-The-Haiku-IDE/Genio
+license: MIT
+categories:
+  - development
+  - editors
+
+author:
+  name: Genio Team
+  contact: https://github.com/Genio-The-Haiku-IDE
+
+packager:
+  name: Andrea Bernardi
+  bacaro: vepro
+
+bridge:
+  haikuports: genio
+  prefer: stable
+
+channels:
+  stable:
+    version: "3.2"
+    kind: hpkg
+    artifacts:
+      x86_64:
+        url: https://example.org/genio-3.2-x86_64.hpkg
+        sha256: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+    requires:
+      - lib:libgit2
+      - cmd:git
+  ombra:
+    kind: hpkg
+    source: github-latest
+    match: "genio-*-{arch}.hpkg"
+    prerelease: true

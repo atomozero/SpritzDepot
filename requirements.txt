@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+bcrypt
+python-jose[cryptography]
+pyyaml
+python-multipart
+email-validator
+httpx
