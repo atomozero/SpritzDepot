@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import subprocess
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -173,17 +174,40 @@ def fetch_verified(url: str, sha256: Optional[str], dest: Path) -> Path:
 
 # ---------- building a sub-repo ----------
 
-def _repo_info_text(name: str, vendor: str, architecture: str, url: str,
+def _repo_info_text(name: str, vendor: str, architecture: str,
+                    identifier: str, base_url: str,
                     summary: str = "spritz repository", priority: int = 1) -> str:
-    # repo.info is a simple key/value text file; quote free-text values.
+    """repo.info is a driver-settings-style text file. Field names per Haiku's
+    parser (RepositoryInfo.cpp): `identifier` is the stable repo identity (the
+    legacy key for it is `url`), `baseurl` is where packages are fetched from.
+    Both name and identifier are required."""
     return (
         f'name\t\t\t{name}\n'
         f'vendor\t\t\t"{vendor}"\n'
         f'summary\t\t\t"{summary}"\n'
         f'priority\t\t{priority}\n'
-        f'url\t\t\t\t"{url}"\n'
+        f'identifier\t\t"{identifier}"\n'
+        f'baseurl\t\t\t"{base_url}"\n'
         f'architecture\t{architecture}\n'
     )
+
+
+def stable_identifier(out_dir: Path) -> str:
+    """Return this sub-repo's identifier UUID, generating and persisting it once.
+
+    The identifier MUST stay constant across rebuilds and mirrors (HaikuDepot
+    keys the repo by it), so we store it in `identifier` next to the sub-repo and
+    reuse it forever after.
+    """
+    id_file = out_dir / "identifier"
+    if id_file.is_file():
+        existing = id_file.read_text().strip()
+        if existing:
+            return existing
+    out_dir.mkdir(parents=True, exist_ok=True)
+    new_id = str(uuid.uuid4())
+    id_file.write_text(new_id + "\n")
+    return new_id
 
 
 def build_subrepo(hpkgs: list[Path], vendor: str, architecture: str,
@@ -194,6 +218,7 @@ def build_subrepo(hpkgs: list[Path], vendor: str, architecture: str,
         out_dir/repo.info
         out_dir/repo               (HPKR catalog)
         out_dir/packages/<file>    (the hpkg, hardlinked/copied in)
+        out_dir/identifier         (persisted stable UUID, not served)
 
     Raises if package_repo rejects the set (e.g. a vendor mismatch slipped in).
     """
@@ -202,10 +227,13 @@ def build_subrepo(hpkgs: list[Path], vendor: str, architecture: str,
     pkg_dir = out_dir / "packages"
     pkg_dir.mkdir(exist_ok=True)
 
-    # repo.info: a stable, filesystem-safe repo name from vendor+arch.
+    # repo.info: a stable, filesystem-safe repo name + a persistent identifier.
     repo_name = re.sub(r"[^A-Za-z0-9_]+", "-", f"{vendor}-{architecture}").strip("-").lower()
+    identifier = stable_identifier(out_dir)
     info_path = out_dir / "repo.info"
-    info_path.write_text(_repo_info_text(repo_name, vendor, architecture, base_url))
+    info_path.write_text(
+        _repo_info_text(repo_name, vendor, architecture, identifier, base_url)
+    )
 
     # Stage packages under packages/ with their canonical filenames, the names
     # the HPKR catalog will record (name-version-arch.hpkg), so fetches resolve.

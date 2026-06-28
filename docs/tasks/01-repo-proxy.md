@@ -78,15 +78,25 @@ stays the source of truth and sha256 is enforced on fetch; we just cannot avoid
 holding the bytes once the catalog references them. Acceptable, and more robust
 (survives the author URL going down between rebuilds).
 
+**Done since the first cut:**
+
+- [x] **Stable repo `identifier` UUID** per sub-repo, persisted in
+  `<sub-repo>/identifier` and reused across rebuilds (`stable_identifier`).
+  repo.info now emits the correct fields: `identifier` (the stable identity) +
+  `baseurl` (where packages are fetched). Note: the earlier cut wrongly used
+  `url` for the base URL; per Haiku's parser `url` is a *legacy alias for
+  identifier*, not the base URL. Fixed.
+- [x] **Auto-rebuild on ingest.** `POST /ingest` rebuilds the affected sub-repos
+  automatically (best-effort; reports under "repo"; `rebuild=false` to skip).
+- [x] **Tamper test** automated in `test_repo_proxy.py`: a wrong sha256 is
+  rejected and the partial file removed; identifier stability and auto-rebuild
+  are covered too.
+
 **Still TODO before calling task 01 complete:**
 
-- **Persist a stable repo `identifier` UUID** per sub-repo (must stay constant
-  across rebuilds/mirrors). Not yet emitted in `repo.info`.
 - **Validate on a real Haiku machine/VM:** add the URL in HaikuDepot or
-  `pkgman add-repo`, confirm it lists and installs. Done off-Haiku so far.
-- **Auto-rebuild trigger** on ingest changes (currently manual via /repo/build).
-- **Tamper test** as an automated case (sha256 mismatch path is coded but the
-  test asserts only the happy path + traversal guard).
+  `pkgman add-repo`, confirm it lists and installs. Done off-Haiku so far; this
+  is the one step that needs Haiku, not WSL.
 
 Scope: **stable channel, kind hpkg, sha256 present.** Nothing else goes in the
 HaikuDepot-compatible repo (ombra is impossible here by nature, zip is not hpkg).
@@ -95,21 +105,22 @@ HaikuDepot-compatible repo (ombra is impossible here by nature, zip is not hpkg)
   vendor-match result). Each (vendor, arch) pair is one sub-repo with its own
   baseUrl. A user adds one URL per vendor they want, the same way HaikuPorts and
   BeSly are separate repos.
-- Generate `repo.info` per sub-repo: stable `identifier` UUID (persist it, it
-  must stay constant across rebuilds and mirrors), correct `architecture`, the
-  vendor, and the spritz baseUrl for that sub-repo as `url`.
+- Generate `repo.info` per sub-repo with Haiku's field names (verified against
+  `RepositoryInfo.cpp`): `name`, `identifier` (persistent UUID, constant across
+  rebuilds/mirrors), `baseurl` (spritz sub-repo URL), `vendor`, `summary`,
+  `priority`, `architecture`. Do NOT use `url` for the base URL: `url` is a
+  legacy alias for `identifier`.
 - Build the HPKR catalog with `package_repo create` over the set of stable hpkg
   for that (vendor, arch).
-- Serve the baseUrl layout, one sub-repo per (vendor, arch). Suggested routes
-  (FastAPI):
+- Serve the layout, one sub-repo per (vendor, arch):
   - `GET /repo/{vendor}/{arch}/current/repo.info`
   - `GET /repo/{vendor}/{arch}/current/repo`
-  - `GET /repo/{vendor}/{arch}/current/packages/{filename}` -> proxy+verify+cache
-- Proxy endpoint: map filename back to its cichéto/artifact, fetch the author
-  URL, verify sha256 against the cichéto, cache under a local packages dir,
-  stream to the client. On hash mismatch: refuse and log loudly.
-- Rebuild trigger: regenerate repo.info + HPKR whenever ingest changes the
-  stable set. Keep it idempotent.
+  - `GET /repo/{vendor}/{arch}/current/packages/{filename}`
+- Packages are fetched + sha256-verified at build time and served from the local
+  cache (mirror-on-build; see DECISIONS). On hash mismatch: refuse, remove the
+  partial, do not catalog it.
+- Rebuild trigger: `/ingest` regenerates the sub-repos automatically; idempotent
+  (stable identifiers are reused). `/repo/build` does a full rebuild on demand.
 
 ## Test
 

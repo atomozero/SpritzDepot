@@ -14,13 +14,14 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
 - **Libreria / coda (effetto Play Store).** L'utente accoda da browser
   (`POST /library/{id}`); il demone Haiku fa polling di `/library/pending`,
   installa, poi conferma con `/library/{id}/installed`.
-- **Layer repo-proxy (compatibile HaikuDepot).** `POST /repo/build` raggruppa i
-  cichéti del canale stable per (vendor, arch), scarica gli hpkg dell'autore
-  verificando lo sha256, e genera un catalogo HPKR con `package_repo`. Le route
-  `/repo/{vendor}/{arch}/current/...` servono `repo.info`, il catalogo e gli
-  hpkg, così basta aggiungere un URL in HaikuDepot. Un sub-repo per vendor,
-  perché `package_repo` impone che tutti i pacchetti di un repo abbiano lo
-  stesso vendor (vedi `docs/DECISIONS.md`).
+- **Layer repo-proxy (compatibile HaikuDepot).** Raggruppa i cichéti del canale
+  stable per (vendor, arch), scarica gli hpkg dell'autore verificando lo sha256,
+  e genera un catalogo HPKR con `package_repo`. Le route
+  `/repo/{vendor}/{arch}/current/...` servono `repo.info` (con un `identifier`
+  UUID stabile), il catalogo e gli hpkg, così basta aggiungere un URL in
+  HaikuDepot. Il rebuild è automatico all'`/ingest` (oppure `POST /repo/build`
+  on demand). Un sub-repo per vendor, perché `package_repo` impone che tutti i
+  pacchetti di un repo abbiano lo stesso vendor (vedi `docs/DECISIONS.md`).
 
 ## Avvio
 
@@ -76,8 +77,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |
 | GET  | `/library` | "le mie app" (auth) |
-| POST | `/ingest` | crawl bàcaro (admin, `X-Admin-Token`) |
-| POST | `/repo/build` | (ri)genera i sub-repo HaikuDepot (admin) |
+| POST | `/ingest` | crawl bàcaro + auto-rebuild repo (admin, `X-Admin-Token`) |
+| POST | `/repo/build` | rebuild completo dei sub-repo HaikuDepot (admin) |
 | GET  | `/repo/{vendor}/{arch}/current/repo.info` | HaikuDepot |
 | GET  | `/repo/{vendor}/{arch}/current/repo` | HaikuDepot (catalogo HPKR) |
 | GET  | `/repo/{vendor}/{arch}/current/packages/{file}` | HaikuDepot (hpkg) |

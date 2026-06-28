@@ -96,6 +96,14 @@ or (b) normalize/override the vendor field in a controlled rebuild step (changes
 the author's bytes, fights the "point back to the author" principle and breaks
 any author signature). Leaning (a). Record the final choice when implementing.
 
+**repo.info field names: `identifier` + `baseurl`, never `url` for the base.**
+Verified against Haiku's parser (`RepositoryInfo.cpp` SetTo): the textual
+repo.info keys are `name`, `identifier`, `baseurl`, `vendor`, `summary`,
+`priority`, `architecture`. `url` is a *legacy alias for identifier*, not the
+base URL, an easy and silent mistake (the first cut made it). `identifier` is
+the stable repo identity HaikuDepot keys on, so spritz generates a UUID once per
+sub-repo and persists it in `<sub-repo>/identifier`, reusing it across rebuilds.
+
 **Repo-proxy is a verified mirror-on-build, not fetch-on-request.** The task 01
 plan said "proxy the bytes on first request." In practice `package_repo` must
 read every hpkg to compute its checksum and attributes when it builds the HPKR

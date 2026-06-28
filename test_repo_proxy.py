@@ -125,6 +125,8 @@ base = full_url.split("/current")[0].split("8000")[-1] + "/current"
 info = c.get(f"{base}/repo.info")
 print("repo.info ->", info.status_code)
 assert info.status_code == 200 and "Genio Team" in info.text, info.text
+# repo.info must use the correct field names (identifier + baseurl, not url).
+assert "identifier" in info.text and "baseurl" in info.text, info.text
 
 cat = c.get(f"{base}/repo")
 print("repo (HPKR) ->", cat.status_code, len(cat.content), "bytes")
@@ -138,5 +140,56 @@ assert hashlib.sha256(pkg.content).hexdigest() == digest, "served package must m
 # path traversal guard
 assert c.get(f"{base}/packages/..%2f..%2frepo.info").status_code in (400, 404)
 
+# --- identifier stays stable across rebuilds (point 1) ---
+import re as _re
+ident1 = _re.search(r'identifier\s+"([^"]+)"', info.text).group(1)
+c.post("/repo/build", headers=admin)
+info2 = c.get(f"{base}/repo.info")
+ident2 = _re.search(r'identifier\s+"([^"]+)"', info2.text).group(1)
+print("identifier stable ->", ident1 == ident2)
+assert ident1 == ident2, f"identifier changed across rebuild: {ident1} != {ident2}"
+
+# --- sha256 tamper is rejected, no file served (point 4) ---
+from app import repo_proxy
+import tempfile as _tf
+bad_dest = Path(_tf.mkdtemp()) / "tampered.hpkg"
+try:
+    repo_proxy.fetch_verified(asset_url, "0" * 64, bad_dest)
+    raise SystemExit("FAIL: tampered sha256 was accepted")
+except repo_proxy.RepoProxyError as e:
+    assert "mismatch" in str(e).lower(), e
+    assert not bad_dest.exists(), "partial file must be removed on hash mismatch"
+print("sha256 tamper      -> rejected, no file left")
+
+# --- automatic rebuild on /ingest (point 3) ---
+# Add a second cichéto, ingest it (rebuild=true default), confirm a new sub-repo
+# appears without a manual /repo/build.
+hpkg2 = build_hpkg("medo", vendor="Zen Team")
+dig2 = sha256(hpkg2)
+bacaro2 = Path(_tf.mkdtemp()) / "vepro2"
+bacaro2.mkdir()
+(bacaro2 / "medo.yaml").write_text(
+    "cicheto: 1\nid: org.zen.medo\nname: Medo\nsummary: video\n"
+    "channels:\n  stable:\n    version: '1.0'\n    kind: hpkg\n    artifacts:\n"
+    f"      x86_64:\n        url: {asset_url.rsplit('/',1)[0]}/{hpkg2.name}\n"
+    f"        sha256: {dig2}\n"
+)
+# turn it into a local git repo so /ingest can clone it
+subprocess.run(["git", "init", "-q"], cwd=bacaro2, check=True)
+subprocess.run(["git", "add", "-A"], cwd=bacaro2, check=True,
+               env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t"})
+subprocess.run(["git", "commit", "-q", "-m", "x"], cwd=bacaro2, check=True,
+               env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+ing = c.post("/ingest", json={"git_url": str(bacaro2), "bacaro": "vepro2"}, headers=admin)
+print("ingest+autobuild ->", ing.status_code, ing.json().get("repo", {}).get("built"))
+assert ing.status_code == 200, ing.text
+built_vendors = {b["vendor"] for b in ing.json()["repo"]["built"]}
+assert "Zen Team" in built_vendors, ing.json()
+# and the new sub-repo is immediately servable
+zen = c.get("/repo/Zen-Team/x86_64/current/repo")
+assert zen.status_code == 200 and zen.content[:4] == b"hpkr", "new repo not served"
+print("new sub-repo served ->", zen.status_code)
+
 httpd.shutdown()
-print("\nPASS: repo-proxy end to end (build, repo.info, HPKR catalog, verified package)")
+print("\nPASS: repo-proxy end to end + stable identifier + sha256 tamper + auto-rebuild")

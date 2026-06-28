@@ -259,12 +259,27 @@ class IngestBody(BaseModel):
 
 
 @app.post("/ingest", dependencies=[Depends(require_admin)])
-def ingest(body: IngestBody):
-    """Crawl a bàcaro git repo into the cache. Admin-only (X-Admin-Token)."""
+def ingest(body: IngestBody, rebuild: bool = True,
+           session: Session = Depends(get_session)):
+    """Crawl a bàcaro git repo into the cache. Admin-only (X-Admin-Token).
+
+    On success the (vendor, arch) sub-repos are rebuilt automatically so the
+    HaikuDepot-compatible catalog tracks the new stable set. Pass rebuild=false
+    to skip it (e.g. batch ingests, then one explicit /repo/build). The rebuild
+    is best-effort: if package_repo is absent or a group fails, the ingest still
+    succeeds and the outcome is reported under "repo".
+    """
     try:
-        return ingest_git(body.git_url, body.bacaro)
+        result = ingest_git(body.git_url, body.bacaro)
     except Exception as e:
         raise HTTPException(400, f"Ingest failed: {e}")
+
+    if rebuild:
+        try:
+            result = {**result, "repo": _rebuild_all_repos(session)}
+        except repo_proxy.ToolUnavailable:
+            result = {**result, "repo": {"skipped": "package_repo not configured"}}
+    return result
 
 
 # ---------- repo-proxy (HaikuDepot-compatible layer) ----------
@@ -300,15 +315,14 @@ def _stable_hpkg_artifacts(session: Session):
                 yield row.id, arch, url, sha
 
 
-@app.post("/repo/build", dependencies=[Depends(require_admin)])
-def build_repos(session: Session = Depends(get_session)):
-    """Admin: (re)build all (vendor, arch) sub-repos from the stable cache.
+def _rebuild_all_repos(session: Session) -> dict:
+    """(Re)build all (vendor, arch) sub-repos from the stable cache. Idempotent.
 
     Fetches each pinned stable hpkg (verified, cached), reads its real vendor
-    from the hpkg, groups by (vendor, arch), and runs package_repo per group.
+    from the hpkg, groups by (vendor, arch), runs package_repo per group.
+    Raises ToolUnavailable if package_repo is not configured.
     """
-    if not repo_proxy.tool_available():
-        raise HTTPException(503, "package_repo not configured (SPRITZ_PACKAGE_REPO_BIN)")
+    repo_proxy._tool_path()  # raises ToolUnavailable -> caller maps to 503
 
     cache = Path(config.REPO_CACHE_DIR) / "hpkg"
     groups: dict[tuple[str, str], list[Path]] = {}
@@ -337,6 +351,15 @@ def build_repos(session: Session = Depends(get_session)):
             errors.append(f"{vendor}/{arch}: {e}")
 
     return {"built": built, "errors": errors}
+
+
+@app.post("/repo/build", dependencies=[Depends(require_admin)])
+def build_repos(session: Session = Depends(get_session)):
+    """Admin: (re)build all (vendor, arch) sub-repos from the stable cache."""
+    try:
+        return _rebuild_all_repos(session)
+    except repo_proxy.ToolUnavailable as e:
+        raise HTTPException(503, str(e))
 
 
 @app.get("/repo/{vendor}/{arch}/current/repo.info", response_class=PlainTextResponse)
