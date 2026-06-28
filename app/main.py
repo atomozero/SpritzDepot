@@ -14,12 +14,15 @@ daemon this is a wishlist; with it, it's remote install.
 from __future__ import annotations
 
 import secrets
+from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Session, select
 
+from . import config, repo_proxy
 from .auth import current_user, hash_password, make_token, verify_password
 from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
@@ -262,6 +265,106 @@ def ingest(body: IngestBody):
         return ingest_git(body.git_url, body.bacaro)
     except Exception as e:
         raise HTTPException(400, f"Ingest failed: {e}")
+
+
+# ---------- repo-proxy (HaikuDepot-compatible layer) ----------
+#
+# Layout served per (vendor, arch) sub-repo:
+#   /repo/{vendor}/{arch}/current/repo.info
+#   /repo/{vendor}/{arch}/current/repo
+#   /repo/{vendor}/{arch}/current/packages/{filename}
+# See app/repo_proxy.py and docs/tasks/01-repo-proxy.md.
+
+def _slug(s: str) -> str:
+    """Filesystem- and URL-safe segment. Used for both the on-disk sub-repo path
+    and the advertised baseUrl, so they never diverge (vendors can have spaces)."""
+    import re as _re
+    return _re.sub(r"[^A-Za-z0-9_.-]+", "-", s).strip("-")
+
+
+def _subrepo_dir(vendor: str, arch: str) -> Path:
+    """Local directory holding a built sub-repo, keyed by slugged vendor/arch."""
+    return Path(config.REPO_CACHE_DIR) / "repos" / _slug(vendor) / _slug(arch)
+
+
+def _stable_hpkg_artifacts(session: Session):
+    """Yield (cicheto_id, arch, url, sha256) for every stable hpkg artifact in
+    the cache that has a pinned sha256. The repo-proxy only carries these."""
+    for row in session.exec(select(CichetoRow)).all():
+        stable = (row.raw.get("channels", {}) or {}).get("stable")
+        if not stable or stable.get("kind", "hpkg") != "hpkg":
+            continue
+        for arch, art in (stable.get("artifacts", {}) or {}).items():
+            url, sha = art.get("url"), art.get("sha256")
+            if url and sha:  # pinned only
+                yield row.id, arch, url, sha
+
+
+@app.post("/repo/build", dependencies=[Depends(require_admin)])
+def build_repos(session: Session = Depends(get_session)):
+    """Admin: (re)build all (vendor, arch) sub-repos from the stable cache.
+
+    Fetches each pinned stable hpkg (verified, cached), reads its real vendor
+    from the hpkg, groups by (vendor, arch), and runs package_repo per group.
+    """
+    if not repo_proxy.tool_available():
+        raise HTTPException(503, "package_repo not configured (SPRITZ_PACKAGE_REPO_BIN)")
+
+    cache = Path(config.REPO_CACHE_DIR) / "hpkg"
+    groups: dict[tuple[str, str], list[Path]] = {}
+    errors: list[str] = []
+    for cid, arch, url, sha in _stable_hpkg_artifacts(session):
+        try:
+            dest = cache / f"{cid}-{arch}.hpkg"
+            repo_proxy.fetch_verified(url, sha, dest)
+            meta = repo_proxy.read_package_meta(dest)
+            groups.setdefault((meta.vendor, meta.architecture), []).append(dest)
+        except repo_proxy.RepoProxyError as e:
+            errors.append(f"{cid}/{arch}: {e}")
+
+    built = []
+    for (vendor, arch), hpkgs in groups.items():
+        out = _subrepo_dir(vendor, arch) / "current"
+        # The advertised baseUrl must use the same slugs the serving routes
+        # resolve, or HaikuDepot's package fetches 404 (vendors can have spaces).
+        base = (f"{config.PUBLIC_BASE_URL.rstrip('/')}"
+                f"/repo/{_slug(vendor)}/{_slug(arch)}/current")
+        try:
+            repo_proxy.build_subrepo(hpkgs, vendor, arch, out, base)
+            built.append({"vendor": vendor, "arch": arch, "packages": len(hpkgs),
+                          "url": base})
+        except repo_proxy.RepoProxyError as e:
+            errors.append(f"{vendor}/{arch}: {e}")
+
+    return {"built": built, "errors": errors}
+
+
+@app.get("/repo/{vendor}/{arch}/current/repo.info", response_class=PlainTextResponse)
+def repo_info(vendor: str, arch: str):
+    path = _subrepo_dir(vendor, arch) / "current" / "repo.info"
+    if not path.is_file():
+        raise HTTPException(404, "repo not built for this vendor/arch")
+    return PlainTextResponse(path.read_text())
+
+
+@app.get("/repo/{vendor}/{arch}/current/repo")
+def repo_catalog(vendor: str, arch: str):
+    path = _subrepo_dir(vendor, arch) / "current" / "repo"
+    if not path.is_file():
+        raise HTTPException(404, "repo not built for this vendor/arch")
+    return FileResponse(path, media_type="application/octet-stream")
+
+
+@app.get("/repo/{vendor}/{arch}/current/packages/{filename}")
+def repo_package(vendor: str, arch: str, filename: str):
+    # Defend against path traversal: only a bare filename is allowed.
+    if "/" in filename or "\\" in filename or filename in ("", ".", ".."):
+        raise HTTPException(400, "bad package filename")
+    path = _subrepo_dir(vendor, arch) / "current" / "packages" / filename
+    if not path.is_file():
+        raise HTTPException(404, "package not in this repo")
+    return FileResponse(path, media_type="application/x-vnd.haiku-package",
+                        filename=filename)
 
 
 @app.get("/")

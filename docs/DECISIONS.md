@@ -96,6 +96,15 @@ or (b) normalize/override the vendor field in a controlled rebuild step (changes
 the author's bytes, fights the "point back to the author" principle and breaks
 any author signature). Leaning (a). Record the final choice when implementing.
 
+**Repo-proxy is a verified mirror-on-build, not fetch-on-request.** The task 01
+plan said "proxy the bytes on first request." In practice `package_repo` must
+read every hpkg to compute its checksum and attributes when it builds the HPKR
+catalog, so the bytes are already local at build time. We keep them and serve
+from cache. sha256 is still verified at fetch and the author URL stays the
+source of truth; this just means spritz holds a copy of each stable hpkg it
+catalogs. Side benefit: a stable repo keeps working if an author URL goes down
+between rebuilds. Implemented in `app/repo_proxy.py`.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

@@ -32,6 +32,19 @@ SECRET_KEY = os.environ.get("SPRITZ_SECRET", _DEV_SECRET)
 # rather than falling back to a guessable value.
 ADMIN_TOKEN = os.environ.get("SPRITZ_ADMIN_TOKEN")
 
+# Path to Haiku's host-built `package_repo` tool (see docs/SETUP-WSL.md step 2).
+# If unset or not found, the repo-proxy layer reports 503 instead of crashing,
+# so the rest of the server runs fine without it.
+PACKAGE_REPO_BIN = os.environ.get("SPRITZ_PACKAGE_REPO_BIN")
+
+# Where the proxy caches downloaded hpkg and generated catalogs. Keep it out of
+# the source tree; gitignored.
+REPO_CACHE_DIR = os.environ.get("SPRITZ_REPO_CACHE", "packages-cache")
+
+# Public base URL the generated repo.info advertises (the `url` field). The repo
+# must be reachable here for HaikuDepot to fetch packages.
+PUBLIC_BASE_URL = os.environ.get("SPRITZ_PUBLIC_BASE_URL", "http://localhost:8000")
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.

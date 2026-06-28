@@ -56,7 +56,37 @@ Full procedure and the result are in `docs/SETUP-WSL.md` step 2 and
    override option (rewriting the author's vendor field) is rejected: it mutates
    the author's bytes and breaks any signature, against the project principle.
 
-## Implementation (spike passed, ready to build)
+## Implementation: FIRST CUT DONE
+
+Implemented in `app/repo_proxy.py` + routes in `app/main.py`, verified end to
+end offline by `test_repo_proxy.py` (builds a real hpkg, serves it over HTTP,
+drives build + the three serving routes, checks the served bytes match the
+verified hpkg). What works now:
+
+- `POST /repo/build` (admin): groups stable hpkg by the vendor read from each
+  hpkg's own `.PackageInfo` (not the cichéto, which has no vendor), per arch;
+  fetches each with sha256 verification; runs `package_repo create` per group.
+- `GET /repo/{vendor}/{arch}/current/{repo.info,repo,packages/<file>}` serve the
+  generated catalog and the staged hpkg (canonical name-version-arch.hpkg).
+- Degrades to 503 when `package_repo` is not configured; rest of the server runs.
+
+**Refinement vs the original "pure proxy" plan:** packages are fetched and kept
+locally at build time, because `package_repo` must read every hpkg to compute
+its checksum and attributes for the catalog. So it is effectively a
+verified mirror-on-build, not a fetch-on-each-request proxy. The author URL
+stays the source of truth and sha256 is enforced on fetch; we just cannot avoid
+holding the bytes once the catalog references them. Acceptable, and more robust
+(survives the author URL going down between rebuilds).
+
+**Still TODO before calling task 01 complete:**
+
+- **Persist a stable repo `identifier` UUID** per sub-repo (must stay constant
+  across rebuilds/mirrors). Not yet emitted in `repo.info`.
+- **Validate on a real Haiku machine/VM:** add the URL in HaikuDepot or
+  `pkgman add-repo`, confirm it lists and installs. Done off-Haiku so far.
+- **Auto-rebuild trigger** on ingest changes (currently manual via /repo/build).
+- **Tamper test** as an automated case (sha256 mismatch path is coded but the
+  test asserts only the happy path + traversal guard).
 
 Scope: **stable channel, kind hpkg, sha256 present.** Nothing else goes in the
 HaikuDepot-compatible repo (ombra is impossible here by nature, zip is not hpkg).
