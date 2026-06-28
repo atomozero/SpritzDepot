@@ -29,27 +29,49 @@ Run the end-to-end test (no network, in-process):
 python test_flow.py
 ```
 
-## 2. Spike: does `package_repo` build here?
+## 2. Build the Haiku host tools (`package`, `package_repo`)
 
 This gates the repo-proxy layer (`docs/tasks/01-repo-proxy.md`). The HPKR
-catalog is a Haiku-specific binary format produced by the `package_repo`
-tool. We need it on the Linux/WSL side to generate repos without a Haiku
-machine in the loop.
+catalog is a Haiku-specific binary format produced by the `package_repo` tool.
+We generate it on the Linux/WSL side, no Haiku machine in the loop.
 
-The tool lives in Haiku's source as a host build tool. Investigate building
-just the host tools (`package`, `package_repo`) from the Haiku tree or
-buildtools, for Linux. Steps to try and document the result of:
+**Confirmed working** on Debian 12 / WSL2 with gcc 12. Procedure:
 
 ```bash
-# clone shallow, do not build the whole OS, only the host tools
+# prerequisites (Debian/Ubuntu)
+sudo apt-get install -y bison flex texinfo zstd nasm xorriso mtools \
+    gettext autoconf automake   # zlib + zstd dev headers also required
+
+# 1. build Haiku's own jam (the stock jam misbehaves on Haiku jamfiles)
+git clone --depth 1 https://github.com/haiku/buildtools.git
+( cd buildtools/jam && make )            # produces ./jam0
+export PATH="$PWD/buildtools/jam:$PATH"   # or copy jam0 -> ~/bin/jam
+
+# 2. Haiku source (shallow; ~300 MB)
 git clone --depth 1 https://github.com/haiku/haiku.git
-# the package tools are under src/tools/ ; check the jam targets for
-# host-side package_repo. Document whether it builds standalone on Linux.
+cd haiku
+
+# 3. configure for host tools only (no cross-tools, no OS image)
+./configure --host-only
+
+# 4. build just the two host tools
+jam -q '<build>package'
+jam -q '<build>package_repo'
+# binaries land under:
+#   generated/objects/linux/x86_64/release/tools/package/package
+#   generated/objects/linux/x86_64/release/tools/package_repo/package_repo
+# run them with LD_LIBRARY_PATH=generated/objects/linux/lib
 ```
 
-If it does not build standalone, the fallback is a Haiku VM that runs the
-repo-build step, or a from-scratch HPKR writer (large, avoid if possible).
-Record the finding in `docs/DECISIONS.md`.
+**One source fix is needed** under gcc 12: `src/kits/storage/sniffer/
+RPattern.cpp` uses `offsetof` without including `<cstddef>`, which is a fatal
+error on modern gcc. Add `#include <cstddef>` at the top of that file before
+step 4. (Upstreamable; trivial.)
+
+Findings recorded in `docs/DECISIONS.md`: the tools build off-Haiku (no VM
+needed for the build step), and `package_repo` enforces a strict vendor-match
+(every package's vendor must equal the repo's vendor, no override), which
+forces a per-vendor sub-repo layout in the proxy.
 
 ## 3. Reset
 

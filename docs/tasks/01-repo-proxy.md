@@ -20,6 +20,16 @@ HaikuDepot reads `repo.info` and the HPKR catalog, then fetches packages from
 the `packages/` directory under the same baseUrl. GitHub release assets at
 arbitrary hosts cannot be referenced directly.
 
+This is now confirmed by authoritative sources, not just inferred: phoudoin
+(HaikuPorts contributor and haiku-os.org moderator) stated it plainly in the
+forum thread ("all packages exposed by the catalog of an HPKG repository are to
+be accessible from the base repository URL + the package file name"), and
+clasqm confirmed it from his own repo-hosting experience. The on-demand proxy
+behavior phoudoin describes (serve base_url + filename, fetch from the external
+URL behind the scenes, verify checksum, cache) is exactly the approach below.
+Official format reference:
+https://www.haiku-os.org/docs/develop/packages/Infrastructure.html
+
 **Therefore spritz must serve the hpkg under its own baseUrl.** Do it as an
 **on-demand proxy**, not a permanent mirror: on first request for a package,
 fetch from the author URL in the cichéto, verify sha256, cache to disk, serve.
@@ -27,41 +37,44 @@ Source of truth stays with the author; we only proxy the bytes because the
 format requires a single baseUrl. This preserves the "always point to the
 author" principle.
 
-## Spike first (do these before writing the server side)
+## Spike: DONE (both unknowns resolved)
 
-Two load-bearing unknowns. Resolve and record both in `docs/DECISIONS.md`
-before building:
+Full procedure and the result are in `docs/SETUP-WSL.md` step 2 and
+`docs/DECISIONS.md`. Summary:
 
-1. **Does `package_repo` build for Linux/WSL?** See `docs/SETUP-WSL.md` step 2.
-   We need it to generate the HPKR catalog off-Haiku. If it does not build
-   standalone, decide the fallback (Haiku VM in the loop vs from-scratch HPKR
-   writer, strongly prefer the VM).
+1. **Does `package_repo` build for Linux/WSL?** YES. `./configure --host-only`
+   then `jam -q '<build>package_repo'` builds it on Debian 12 / WSL2 (one
+   trivial source fix: add `#include <cstddef>` to `RPattern.cpp` for gcc 12).
+   Verified end to end: built a test hpkg, ran `package_repo create` to produce
+   the HPKR catalog, listed it back. **No Haiku VM needed for the build step.**
 
-2. **Does the vendor-match requirement block heterogeneous author hpkg?**
-   Older docs state every hpkg's internal `.PackageInfo` vendor must match the
-   repo's vendor or the repo will not build. If `package_repo` still enforces
-   uniform vendor, proxying many third-party authors' packages into one repo
-   breaks. Verify against current `package_repo`. If it is enforced, options:
-   one sub-repo per author/vendor, or a controlled override. Decide and record.
+2. **Vendor-match: ENFORCED, no override.** `package_repo create` aborts the
+   whole repo (`B_BAD_DATA`) if any package's vendor differs from the repo's
+   vendor (`RepositoryWriterImpl.cpp:404-411`). So a single flat repo cannot
+   hold many third-party authors. **Decision: per-vendor sub-repos** (option a):
+   each vendor gets its own baseUrl + repo.info + HPKR, internally uniform. The
+   override option (rewriting the author's vendor field) is rejected: it mutates
+   the author's bytes and breaks any signature, against the project principle.
 
-Do not skip the spike. If either answer is bad, the whole layer changes shape.
-
-## Implementation (only after the spike passes)
+## Implementation (spike passed, ready to build)
 
 Scope: **stable channel, kind hpkg, sha256 present.** Nothing else goes in the
 HaikuDepot-compatible repo (ombra is impossible here by nature, zip is not hpkg).
 
-- One repo per architecture (`x86_64`, `x86_gcc2h`, ...). Group cichéti by the
-  arches present in their stable channel.
-- Generate `repo.info` per arch: stable `identifier` UUID (persist it, it must
-  stay constant across rebuilds and mirrors), correct `architecture`, the
-  spritz baseUrl as `url`.
-- Build the HPKR catalog with `package_repo` (or the VM fallback) over the set
-  of stable hpkg for that arch.
-- Serve the baseUrl layout. Suggested routes (FastAPI):
-  - `GET /repo/{arch}/current/repo.info`
-  - `GET /repo/{arch}/current/repo`
-  - `GET /repo/{arch}/current/packages/{filename}` -> proxy + verify + cache
+- **Group by (vendor, architecture), not just architecture** (forced by the
+  vendor-match result). Each (vendor, arch) pair is one sub-repo with its own
+  baseUrl. A user adds one URL per vendor they want, the same way HaikuPorts and
+  BeSly are separate repos.
+- Generate `repo.info` per sub-repo: stable `identifier` UUID (persist it, it
+  must stay constant across rebuilds and mirrors), correct `architecture`, the
+  vendor, and the spritz baseUrl for that sub-repo as `url`.
+- Build the HPKR catalog with `package_repo create` over the set of stable hpkg
+  for that (vendor, arch).
+- Serve the baseUrl layout, one sub-repo per (vendor, arch). Suggested routes
+  (FastAPI):
+  - `GET /repo/{vendor}/{arch}/current/repo.info`
+  - `GET /repo/{vendor}/{arch}/current/repo`
+  - `GET /repo/{vendor}/{arch}/current/packages/{filename}` -> proxy+verify+cache
 - Proxy endpoint: map filename back to its cichéto/artifact, fetch the author
   URL, verify sha256 against the cichéto, cache under a local packages dir,
   stream to the client. On hash mismatch: refuse and log loudly.
@@ -80,3 +93,13 @@ HaikuDepot-compatible repo (ombra is impossible here by nature, zip is not hpkg)
 
 ombra channel, zip/non-packaged sources, the remote browser queue. Those are
 native-client territory and stay out of the HaikuDepot-compatible repo.
+
+Note on ombra (raised by phoudoin): "follow the author's latest release"
+splits in two. When the author publishes a ready-made .hpkg per release (e.g. a
+GitHub release asset), spritz only has to track the new asset URL + checksum,
+which is in reach. When the latest release is *source* that must be compiled
+and packaged, that needs detect-change + auto-rebuild + auto-version
+infrastructure, i.e. a build farm (what Haiku's and HaikuPorts' buildbots do).
+The native client targets the first case; the build-farm case is explicitly a
+later, separate leg (the future "services" leg: donations, paid apps, hpkg
+build farm). Do not let ombra scope-creep into building packages here.

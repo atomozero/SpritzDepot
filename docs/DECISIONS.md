@@ -56,12 +56,49 @@ setup; it must never reach production, which the gate enforces.
 clone size/time caps). Tracked in `docs/tasks/02-security-hardening.md`; still
 required before the repo goes public.
 
+**HPKG repos are single-baseUrl; the proxy must serve bytes, not link out.**
+Confirmed authoritatively in the forum thread by phoudoin (HaikuPorts
+contributor, haiku-os.org moderator) and by clasqm from repo-hosting
+experience: HaikuDepot fetches every package as `baseUrl + filename`, so
+arbitrary per-package URLs (GitHub release assets) cannot be referenced
+directly. spritz therefore serves stable hpkg under its own baseUrl as an
+on-demand proxy (fetch from author URL, verify sha256, cache), never a
+permanent mirror. This was already the task 01 design; it is now fact, not
+assumption. Ref: https://www.haiku-os.org/docs/develop/packages/Infrastructure.html
+
+**ombra never builds packages here.** Following an author's latest release is
+in scope only when the author ships a ready-made .hpkg per release (track the
+new asset URL + checksum). Latest-release-as-source requires auto-build /
+auto-version infrastructure (a build farm), which is a separate, later leg, not
+part of the repo-proxy or the first native client.
+
+**`package_repo` builds and runs on Linux/WSL. Spike done.** (Debian 12 / WSL2,
+gcc 12.) Steps that worked, recorded in SETUP-WSL.md: build Haiku's `jam` from
+`buildtools/jam`; `git clone --depth 1` the `haiku` tree; `./configure
+--host-only` (no cross-tools, no OS image); `jam -q '<build>package_repo'` (and
+`'<build>package'`). One source fix was needed: `src/kits/storage/sniffer/
+RPattern.cpp` is missing `#include <cstddef>` for `offsetof`, fatal under gcc
+12. Verified end to end: built a test .hpkg with `package`, ran `package_repo
+create` to produce the HPKR catalog (it computes the package checksum itself),
+and `package_repo list` reads it back. So the HaikuDepot-compatible catalog can
+be generated entirely off-Haiku; no VM needed for the build step.
+
+**Vendor-match IS enforced, with no override. This shapes the repo layout.**
+`package_repo create` rejects any package whose `.PackageInfo` vendor differs
+(case-insensitive) from the repository's `vendor`, aborting the whole repo with
+`B_BAD_DATA`. Verified live ("package 'x' has unexpected vendor ... (expected
+...)") and in source: `src/kits/package/hpkg/RepositoryWriterImpl.cpp:404-411`,
+comment "all packages must have the same vendor as the repository". There is no
+CLI flag to disable it. Consequence: spritz CANNOT pour many third-party
+authors' hpkg into one flat repo. Options to decide in task 01: (a) one sub-repo
+per vendor (baseUrl per vendor, many repo.info/HPKR, each internally uniform),
+or (b) normalize/override the vendor field in a controlled rebuild step (changes
+the author's bytes, fights the "point back to the author" principle and breaks
+any author signature). Leaning (a). Record the final choice when implementing.
+
 ## Open (resolve and record here)
 
-- **Does `package_repo` build for Linux/WSL?** Gates task 01. See SETUP-WSL.md.
-- **Vendor-match requirement.** Does current `package_repo` require every
-  hpkg's internal vendor to match the repo vendor? If yes, proxying many
-  authors into one repo needs a workaround (sub-repos per vendor, or override).
+- **HaikuDepot and duplicate packages across repos.** phoudoin was unsure
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure
   whether HaikuDepot cleanly handles the same package/version in multiple
   repos. Relevant once spritz coexists with haiku/haikuports. Verify.
