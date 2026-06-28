@@ -7,3 +7,4 @@ pyyaml
 python-multipart
 email-validator
 httpx
+slowapi

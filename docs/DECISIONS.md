@@ -113,6 +113,25 @@ source of truth; this just means spritz holds a copy of each stable hpkg it
 catalogs. Side benefit: a stable repo keeps working if an author URL goes down
 between rebuilds. Implemented in `app/repo_proxy.py`.
 
+**Token revocation via a per-user version, not a token blacklist or refresh
+flow.** JWTs carry `ver` (the user's `token_version`); `current_user` rejects a
+token whose `ver` is stale. Bumping `token_version` (logout-all, password
+change) invalidates every outstanding token at once, with no server-side token
+store. Access TTL cut to 2h. A full refresh-token flow is deferred: this covers
+revocation, which was the actual requirement, at a fraction of the complexity.
+
+**Security relaxations are dev-only and gated on `SPRITZ_ENV`.** Two checks are
+strict in prod and relaxed in dev so tests and local work stay frictionless: the
+ingest URL validator allows local/file bàcari only in dev, and the proxy SSRF
+guard allows http + loopback only in dev. In prod both demand https and reject
+internal addresses. The relaxation can never reach prod because it is keyed on
+`IS_PROD`, the same flag the startup gate enforces.
+
+**Rate-limit storage is in-memory for now.** slowapi with the default in-process
+store is correct for a single worker. Before running multiple workers in prod,
+point it at Redis (`storage_uri`), or limits are per-process and thus looser.
+Recorded so it is not forgotten at deploy time.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

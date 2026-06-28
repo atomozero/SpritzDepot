@@ -14,35 +14,44 @@ nice-to-have.
       `app/config.py`. In `prod` mode (`SPRITZ_ENV=prod`) the app refuses to
       start if `SPRITZ_SECRET` or `SPRITZ_ADMIN_TOKEN` is missing or still the
       dev default; in `dev` it warns. Verified by `test_security.py`.
-- [ ] **Rate limiting.** At minimum on `/auth/login`, `/auth/register`, and
-      `/ingest`. Use slowapi or equivalent. Prevents credential stuffing and
-      ingest abuse.
-- [ ] **HTTPS only** in production. Reject or redirect plain HTTP. Set secure
-      headers (HSTS).
-- [ ] **Input validation on ingest.** Validate the git URL scheme (https only,
-      no file://, no ssh to arbitrary hosts), cap repo size and file count,
-      time-limit the clone. A malicious bàcaro must not be able to hang or
-      fill the disk.
+- [x] **Rate limiting.** Done with slowapi (keyed by client IP): `/auth/login`
+      10/min, `/auth/register` 5/min, `/auth/change-password` 5/min, `/ingest`
+      10/min. 429 on exceed. In-memory store; point at Redis in prod for
+      multi-process correctness.
+- [x] **HTTPS only** in production. `HTTPSRedirectAndHSTS` middleware redirects
+      plain HTTP to HTTPS (honoring `X-Forwarded-Proto`) and sets HSTS, in prod
+      only (dev http://localhost still works).
+- [x] **Input validation on ingest.** `ingest.py` validates the git URL scheme
+      (https always; local/file only in dev, never in prod; ssh/git/ftp
+      rejected), times out the clone (60s), and caps repo size (50 MB) and file
+      count (5000).
 
 ## Should fix soon
 
-- [ ] **Password policy.** Enforce a minimum length. bcrypt already truncates
-      at 72 bytes (handled in `auth.py`), keep that.
-- [ ] **Token lifetime + revocation.** One-week JWT with no revocation is
-      coarse. Consider shorter access tokens plus a refresh mechanism, or a
-      token version field on the user for invalidation.
-- [ ] **Generic auth errors.** Login already returns a generic 401, keep it
-      that way (do not leak whether the email exists).
-- [ ] **CORS.** Lock the allowed origins to the known web frontend, not `*`.
-- [ ] **Proxy SSRF guard** (overlaps with task 01). When the repo-proxy fetches
-      an author URL, restrict to https public hosts, block internal/loopback
-      addresses, cap response size, and always verify sha256.
+- [x] **Password policy.** Minimum length 8 (`MIN_PASSWORD_LENGTH`), enforced at
+      register and change-password via Pydantic (422 on violation). bcrypt's
+      72-byte truncation kept.
+- [x] **Token lifetime + revocation.** Access token TTL cut to 2h. Revocation
+      via a per-user `token_version` carried in the JWT; `/auth/logout-all` and
+      `/auth/change-password` bump it, invalidating all outstanding tokens.
+- [x] **Generic auth errors.** Login returns a generic 401 regardless of whether
+      the email exists. Kept and commented.
+- [x] **CORS.** Locked to `SPRITZ_CORS_ORIGINS` (default localhost dev frontend),
+      never `*`.
+- [x] **Proxy SSRF guard.** `repo_proxy._guard_fetch_url`: in prod, https only
+      and reject private/loopback/link-local/reserved resolved addresses; caps
+      the download (500 MB) and always verifies sha256. Relaxed in dev (tests
+      fetch from 127.0.0.1).
 
 ## Verify
 
-- Confirm `/ingest` returns 401/403 unauthenticated.
-- Confirm the app refuses to start with no `SPRITZ_SECRET` set in prod mode.
-- Confirm repeated bad logins get rate-limited.
-- Confirm the proxy rejects a hash mismatch and a loopback URL.
+All covered by `test_security.py` (and the proxy paths by `test_repo_proxy.py`):
 
-Record anything deferred, with the reason, in `docs/DECISIONS.md`.
+- `/ingest` returns 401 unauthenticated, 400 on an ssh:// URL.
+- The app refuses to start with no `SPRITZ_SECRET` in prod mode.
+- Repeated bad logins get rate-limited (429 after the budget).
+- Short passwords are rejected (422); logout-all / change-password revoke tokens.
+- The proxy rejects a sha256 mismatch (loopback rejection is prod-only, so it is
+  exercised by code review of `_guard_fetch_url`, not the dev-mode test).
+
+Anything deferred is recorded in `docs/DECISIONS.md`.

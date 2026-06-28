@@ -139,27 +139,73 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+# Cap on a single downloaded artifact, to bound disk and a hostile server.
+MAX_ARTIFACT_BYTES = 500 * 1024 * 1024  # 500 MB
+
+
+def _guard_fetch_url(url: str) -> None:
+    """SSRF guard for author URLs. In prod: https only, and reject private /
+    loopback / link-local hosts so a cichéto cannot make spritz fetch internal
+    services. In dev: relaxed (tests fetch from 127.0.0.1)."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    host = parsed.hostname
+
+    if not host:
+        raise RepoProxyError(f"refusing to fetch URL with no host: {url}")
+    if not config.IS_PROD:
+        return  # dev/test: allow http + loopback
+
+    if scheme != "https":
+        raise RepoProxyError(f"refusing non-https author URL in prod: {url}")
+    # Resolve and reject any address that is not a global unicast public IP.
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror as e:
+        raise RepoProxyError(f"cannot resolve host {host}: {e}") from e
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            raise RepoProxyError(f"refusing to fetch internal address {ip} ({host})")
+
+
 def fetch_verified(url: str, sha256: Optional[str], dest: Path) -> Path:
     """Download `url` to `dest`, verifying sha256 if given. Cached: if dest
     already exists and (when a hash is given) matches, reuse it.
 
     On hash mismatch the partial file is removed and an error is raised, loudly.
     A missing sha256 is allowed only for unpinned channels; the caller decides.
+    The URL is SSRF-guarded and the download is size-capped.
     """
     if dest.exists() and sha256 and _sha256_file(dest) == sha256.lower():
         return dest
 
+    _guard_fetch_url(url)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     try:
         with httpx.stream("GET", url, follow_redirects=True, timeout=60.0) as r:
             r.raise_for_status()
+            written = 0
             with tmp.open("wb") as f:
                 for chunk in r.iter_bytes(1 << 20):
+                    written += len(chunk)
+                    if written > MAX_ARTIFACT_BYTES:
+                        raise RepoProxyError(
+                            f"artifact exceeds {MAX_ARTIFACT_BYTES} bytes: {url}"
+                        )
                     f.write(chunk)
     except httpx.HTTPError as e:
         tmp.unlink(missing_ok=True)
         raise RepoProxyError(f"failed to fetch {url}: {e}") from e
+    except RepoProxyError:
+        tmp.unlink(missing_ok=True)
+        raise
 
     if sha256:
         got = _sha256_file(tmp)

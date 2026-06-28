@@ -46,9 +46,12 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_PACKAGE_REPO_BIN` | non impostata | Path al tool `package_repo` di Haiku (vedi `docs/SETUP-WSL.md`). Senza, il layer repo-proxy risponde 503; il resto del server gira lo stesso. |
 | `SPRITZ_REPO_CACHE` | `packages-cache` | Dir dove il repo-proxy scarica gli hpkg e genera i cataloghi. Fuori dal sorgente, gitignored. |
 | `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | URL pubblico annunciato in `repo.info`. Deve essere raggiungibile da HaikuDepot. |
+| `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
-sono ancora il default di sviluppo. In `dev` parte ma logga un avviso.
+sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
+l'HTTP viene rediretto a HTTPS (con HSTS); in `dev` `http://localhost` resta
+valido. Login/register/ingest sono rate-limited (429 oltre la soglia).
 
 ## Struttura
 
@@ -72,7 +75,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/search?q=` | catalogo web |
 | GET  | `/cicheto/{id}` | pagina-app |
 | GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
-| POST | `/auth/register` · `/auth/login` | account |
+| POST | `/auth/register` · `/auth/login` | account (rate-limited) |
+| POST | `/auth/change-password` · `/auth/logout-all` | account (revoca i token) |
 | POST | `/library/{id}` | accoda install (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |
@@ -92,13 +96,20 @@ sample-bacaro/   cichéto d'esempio (Genio)
 4. **Tier di fiducia, firma manifest, transparency log** — fuori dal cichéto,
    asserzioni firmate dell'indice.
 5. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
-6. Rate-limit (login, register, ingest), HTTPS/HSTS, magic-link opzionale.
+6. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
 
 ## Note di sicurezza
 
 - **`/ingest` è admin-only** (`X-Admin-Token`); chiuso se il token non è
   configurato. La chiave JWT e il token admin vengono dall'ambiente, e in
   `prod` l'app rifiuta di partire senza (vedi Variabili d'ambiente).
+- **Auth**: password min 8 caratteri, JWT a vita breve (2h) con revoca via
+  `token_version` (`logout-all`, cambio password). Login con 401 generico (non
+  rivela se l'email esiste). Rate-limit su login/register/ingest.
+- **Ingest**: URL git validato (https; locale solo in dev), clone con timeout e
+  cap su dimensione e numero file.
+- **Repo-proxy**: SSRF guard sugli URL autore (in prod solo https, no indirizzi
+  interni/loopback), download con cap di dimensione, sha256 sempre verificato.
 - `sha256` obbligatorio sui canali pinned; verificato dal demone al download.
 - I canali `github-latest` non pre-calcolano l'hash: il demone verifica al volo
   e logga l'hash visto (trade-off accettabile per i soli nightly).

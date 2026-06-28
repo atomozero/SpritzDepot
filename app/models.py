@@ -36,6 +36,11 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Bumped to invalidate all of a user's outstanding tokens at once. The JWT
+    # carries the version it was minted with; tokens whose version is stale are
+    # rejected. This is the revocation mechanism (logout-everywhere, on a
+    # password change, or on compromise).
+    token_version: int = Field(default=0)
 
 
 class InstallState(SQLModel, table=True):

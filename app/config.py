@@ -45,6 +45,15 @@ REPO_CACHE_DIR = os.environ.get("SPRITZ_REPO_CACHE", "packages-cache")
 # must be reachable here for HaikuDepot to fetch packages.
 PUBLIC_BASE_URL = os.environ.get("SPRITZ_PUBLIC_BASE_URL", "http://localhost:8000")
 
+# Allowed CORS origins for the web frontend, comma-separated. Locked, never "*"
+# in prod (credentials + wildcard is unsafe and disallowed by browsers anyway).
+# Default: the dev frontend on localhost.
+CORS_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "SPRITZ_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000"
+    ).split(",") if o.strip()
+]
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.

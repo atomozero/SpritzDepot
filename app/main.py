@@ -17,19 +17,61 @@ import secrets
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
-from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import BaseModel, EmailStr
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from pydantic import BaseModel, EmailStr, Field as PField
 from sqlmodel import Session, select
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import config, repo_proxy
-from .auth import current_user, hash_password, make_token, verify_password
+from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
+                   verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_git
 from .models import CichetoRow, InstallState, User
 
+# Rate limiter keyed by client IP. In-memory by default; point storage_uri at
+# Redis in prod for multi-process correctness.
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="spritz registry", version="0.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+class HTTPSRedirectAndHSTS(BaseHTTPMiddleware):
+    """In prod, redirect plain HTTP to HTTPS and set HSTS on responses.
+
+    Honors X-Forwarded-Proto so it works behind a TLS-terminating proxy. No-op
+    in dev so local http://localhost keeps working.
+    """
+    async def dispatch(self, request: Request, call_next):
+        if config.IS_PROD:
+            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            if proto != "https":
+                https_url = request.url.replace(scheme="https")
+                return RedirectResponse(str(https_url), status_code=307)
+        response = await call_next(request)
+        if config.IS_PROD:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains"
+            )
+        return response
+
+
+app.add_middleware(HTTPSRedirectAndHSTS)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
@@ -65,12 +107,17 @@ def require_admin(x_admin_token: Optional[str] = Header(default=None)) -> None:
 
 class RegisterBody(BaseModel):
     email: EmailStr
-    password: str
+    password: str = PField(min_length=MIN_PASSWORD_LENGTH)
 
 
 class LoginBody(BaseModel):
     email: EmailStr
     password: str
+
+
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str = PField(min_length=MIN_PASSWORD_LENGTH)
 
 
 class TokenOut(BaseModel):
@@ -86,7 +133,9 @@ class QueueBody(BaseModel):
 # ---------- auth ----------
 
 @app.post("/auth/register", response_model=TokenOut)
-def register(body: RegisterBody, session: Session = Depends(get_session)):
+@limiter.limit("5/minute")
+def register(request: Request, body: RegisterBody,
+             session: Session = Depends(get_session)):
     exists = session.exec(select(User).where(User.email == body.email)).first()
     if exists:
         raise HTTPException(409, "Email already registered")
@@ -98,11 +147,42 @@ def register(body: RegisterBody, session: Session = Depends(get_session)):
 
 
 @app.post("/auth/login", response_model=TokenOut)
-def login(body: LoginBody, session: Session = Depends(get_session)):
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginBody,
+          session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == body.email)).first()
+    # Generic 401 either way: never leak whether the email exists.
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Wrong email or password")
     return TokenOut(access_token=make_token(user))
+
+
+@app.post("/auth/change-password", response_model=TokenOut)
+@limiter.limit("5/minute")
+def change_password(request: Request, body: ChangePasswordBody,
+                    user: User = Depends(current_user),
+                    session: Session = Depends(get_session)):
+    """Change the password and revoke every existing token (version bump). The
+    caller gets a fresh token so they stay logged in on this device."""
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(401, "Wrong password")
+    user.password_hash = hash_password(body.new_password)
+    user.token_version += 1
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return TokenOut(access_token=make_token(user))
+
+
+@app.post("/auth/logout-all")
+def logout_all(user: User = Depends(current_user),
+               session: Session = Depends(get_session)):
+    """Invalidate all of this user's tokens (logout everywhere) by bumping the
+    token version. The current token becomes invalid too."""
+    user.token_version += 1
+    session.add(user)
+    session.commit()
+    return {"status": "all tokens revoked"}
 
 
 # ---------- public catalog ----------
@@ -259,14 +339,16 @@ class IngestBody(BaseModel):
 
 
 @app.post("/ingest", dependencies=[Depends(require_admin)])
-def ingest(body: IngestBody, rebuild: bool = True,
+@limiter.limit("10/minute")
+def ingest(request: Request, body: IngestBody, rebuild: bool = True,
            session: Session = Depends(get_session)):
     """Crawl a bàcaro git repo into the cache. Admin-only (X-Admin-Token).
 
-    On success the (vendor, arch) sub-repos are rebuilt automatically so the
-    HaikuDepot-compatible catalog tracks the new stable set. Pass rebuild=false
-    to skip it (e.g. batch ingests, then one explicit /repo/build). The rebuild
-    is best-effort: if package_repo is absent or a group fails, the ingest still
+    The git URL is validated (https, or local only in dev) and the clone is
+    size/file/time-capped (see ingest.py). On success the (vendor, arch)
+    sub-repos are rebuilt automatically so the HaikuDepot-compatible catalog
+    tracks the new stable set. Pass rebuild=false to skip it. The rebuild is
+    best-effort: if package_repo is absent or a group fails, the ingest still
     succeeds and the outcome is reported under "repo".
     """
     try:
