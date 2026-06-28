@@ -19,7 +19,10 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
+                               RedirectResponse)
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field as PField
 from sqlmodel import Session, select
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -72,6 +75,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Server-rendered frontend (Jinja). Kept simple for WebPositive (see task 03).
+_HERE = Path(__file__).parent
+templates = Jinja2Templates(directory=str(_HERE / "templates"))
+app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
 
 @app.on_event("startup")
@@ -187,9 +195,8 @@ def logout_all(user: User = Depends(current_user),
 
 # ---------- public catalog ----------
 
-@app.get("/search")
-def search(q: str = Query("", description="free-text query"),
-           session: Session = Depends(get_session)):
+def _search_rows(session: Session, q: str) -> list[dict]:
+    """Shared search used by both the JSON API and the HTML home."""
     stmt = select(CichetoRow)
     if q:
         like = f"%{q}%"
@@ -205,6 +212,12 @@ def search(q: str = Query("", description="free-text query"),
          "haikuports": r.haikuports}
         for r in rows
     ]
+
+
+@app.get("/search")
+def search(q: str = Query("", description="free-text query"),
+           session: Session = Depends(get_session)):
+    return _search_rows(session, q)
 
 
 @app.get("/cicheto/{cicheto_id}")
@@ -472,6 +485,58 @@ def repo_package(vendor: str, arch: str, filename: str):
                         filename=filename)
 
 
-@app.get("/")
-def root():
+# ---------- web frontend (server-rendered, WebPositive-friendly) ----------
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, q: str = Query(""),
+         session: Session = Depends(get_session)):
+    """Catalog home + search. Reuses the same query as /search."""
+    results = _search_rows(session, q)
+    return templates.TemplateResponse(
+        request, "home.html", {"q": q, "results": results}
+    )
+
+
+@app.get("/app/{cicheto_id}", response_class=HTMLResponse)
+def app_page(request: Request, cicheto_id: str,
+             session: Session = Depends(get_session)):
+    """Full cichéto page with the degrading install button."""
+    row = session.get(CichetoRow, cicheto_id)
+    if not row:
+        raise HTTPException(404, "Cichéto not found")
+    app_data = row.raw
+    # If a built stable sub-repo exists, hand the page its public URL so the
+    # fallback button can point HaikuDepot at it.
+    repo_base = _stable_repo_url_for(session, row)
+    return templates.TemplateResponse(
+        request, "app.html", {"app": app_data, "repo_base": repo_base}
+    )
+
+
+@app.get("/get-spritz", response_class=HTMLResponse)
+def get_spritz(request: Request):
+    """Placeholder bootstrap page for the native client (built later)."""
+    return templates.TemplateResponse(request, "get_spritz.html", {})
+
+
+def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:
+    """Best-effort: the public repo.info URL of a built stable sub-repo holding
+    this app, if one exists on disk. Picks the first matching (vendor, arch)."""
+    stable = (row.raw.get("channels", {}) or {}).get("stable") or {}
+    for arch in (stable.get("artifacts", {}) or {}).keys():
+        # We don't know the vendor without the built hpkg; scan built sub-repos
+        # for this arch that contain a package for this app.
+        repos_root = Path(config.REPO_CACHE_DIR) / "repos"
+        if not repos_root.is_dir():
+            return None
+        for vendor_dir in repos_root.iterdir():
+            info = vendor_dir / _slug(arch) / "current" / "repo.info"
+            if info.is_file():
+                return (f"{config.PUBLIC_BASE_URL.rstrip('/')}"
+                        f"/repo/{vendor_dir.name}/{_slug(arch)}/current")
+    return None
+
+
+@app.get("/api")
+def api_root():
     return {"service": "spritz registry", "version": "0.1.0", "docs": "/docs"}

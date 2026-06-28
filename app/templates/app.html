@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ app.name }} - spritz{% endblock %}
+{% block description %}{{ app.summary }} Installa {{ app.name }} per Haiku da spritz.{% endblock %}
+
+{% block content %}
+<article class="app-detail">
+  <header class="app-detail-head">
+    {% if app.icon %}
+    <img class="app-icon" src="{{ app.icon }}" alt="" width="64" height="64">
+    {% endif %}
+    <div>
+      <h1>{{ app.name }}</h1>
+      <p class="app-summary">{{ app.summary }}</p>
+    </div>
+  </header>
+
+  {% if app.bridge and app.bridge.haikuports %}
+  <div class="bridge-note">
+    <strong>Anche su HaikuPorts.</strong>
+    Questa app e' disponibile pure nei repository ufficiali, come
+    <code>{{ app.bridge.haikuports }}</code>.
+    {% if app.bridge.prefer == 'stable' %}
+    Per la versione curata e stabile, usa quella di HaikuPorts in HaikuDepot.
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <section class="install">
+    <h2>Installa</h2>
+    {% for channel_name, ch in app.channels.items() %}
+    <div class="channel" data-channel="{{ channel_name }}"
+         data-cicheto="{{ app.id }}">
+      <h3>
+        Canale {{ channel_name }}
+        {% if ch.version %}<span class="version">v{{ ch.version }}</span>{% endif %}
+      </h3>
+
+      <!-- Default (no native client): the fallback. JS upgrades this to a
+           spritz:// deep link if the local client answers. -->
+      <div class="install-actions">
+        {% if channel_name == 'stable' and repo_base %}
+        <a class="btn btn-fallback"
+           href="{{ repo_base }}">Aggiungi il repository in HaikuDepot</a>
+        <p class="hint">
+          Copia questo URL in HaikuDepot (Repository), poi installa {{ app.name }}
+          come qualsiasi altro pacchetto. Nessun client aggiuntivo richiesto.
+        </p>
+        {% elif channel_name == 'stable' %}
+        <p class="hint">
+          Il repository per questo canale non e' ancora stato generato.
+          Riprova piu' tardi, oppure usa il client spritz nativo.
+        </p>
+        {% else %}
+        <p class="hint">
+          Il canale <em>{{ channel_name }}</em> segue l'ultima release
+          dell'autore e richiede il client spritz nativo.
+        </p>
+        {% endif %}
+        <a class="btn btn-bootstrap" href="/get-spritz">
+          Installa spritz per aggiornamenti automatici e installazione in un clic
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="app-info">
+    {% if app.author %}
+    <p><strong>Autore:</strong> {{ app.author.name }}
+      {% if app.author.contact %}
+      (<a href="{{ app.author.contact }}">{{ app.author.contact }}</a>)
+      {% endif %}
+    </p>
+    {% endif %}
+    {% if app.packager %}
+    <p><strong>Packager:</strong> {{ app.packager.name }}
+      (bacaro {{ app.packager.bacaro }})</p>
+    {% endif %}
+    {% if app.homepage %}
+    <p><strong>Sito:</strong> <a href="{{ app.homepage }}">{{ app.homepage }}</a></p>
+    {% endif %}
+    {% if app.license %}<p><strong>Licenza:</strong> {{ app.license }}</p>{% endif %}
+  </section>
+
+  {% if app.screenshots %}
+  <section class="screenshots">
+    <h2>Schermate</h2>
+    {% for shot in app.screenshots %}
+    <img class="screenshot" src="{{ shot }}" alt="Schermata di {{ app.name }}">
+    {% endfor %}
+  </section>
+  {% endif %}
+</article>
+
+<script src="/static/install-button.js"></script>
+{% endblock %}

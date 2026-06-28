@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}spritz: catalogo software per Haiku{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>Il catalogo del software per Haiku</h1>
+  <p class="lead">
+    Trova app native, sempre dagli autori originali. spritz raccoglie le fonti
+    che esistono gia' (release su GitHub, repository di terze parti, archivi
+    storici) in un unico indice cercabile.
+  </p>
+  <form class="search-big" action="/" method="get">
+    <input type="text" name="q" value="{{ q|default('') }}"
+           placeholder="Es. Genio, editor, IDE" aria-label="Cerca">
+    <button type="submit">Cerca</button>
+  </form>
+</section>
+
+{% if q %}
+<section class="results">
+  <h2>Risultati per "{{ q }}"</h2>
+  {% if results %}
+  <ul class="app-list">
+    {% for app in results %}
+    <li class="app-card">
+      <a class="app-link" href="/app/{{ app.id }}">
+        <span class="app-name">{{ app.name }}</span>
+        <span class="app-summary">{{ app.summary }}</span>
+      </a>
+      <div class="app-meta">
+        <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
+        {% for ch in app.channels %}
+        <span class="badge badge-channel">{{ ch }}</span>
+        {% endfor %}
+        {% if app.haikuports %}
+        <span class="badge badge-bridge" title="Disponibile anche su HaikuPorts">
+          anche su HaikuPorts
+        </span>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Nessun risultato. Prova con un altro termine.</p>
+  {% endif %}
+</section>
+{% else %}
+<section class="results">
+  <h2>Sfoglia</h2>
+  {% if results %}
+  <ul class="app-list">
+    {% for app in results %}
+    <li class="app-card">
+      <a class="app-link" href="/app/{{ app.id }}">
+        <span class="app-name">{{ app.name }}</span>
+        <span class="app-summary">{{ app.summary }}</span>
+      </a>
+      <div class="app-meta">
+        <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
+        {% for ch in app.channels %}
+        <span class="badge badge-channel">{{ ch }}</span>
+        {% endfor %}
+        {% if app.haikuports %}
+        <span class="badge badge-bridge">anche su HaikuPorts</span>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Il catalogo e' ancora vuoto.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

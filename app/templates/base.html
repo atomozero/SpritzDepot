@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}spritz{% endblock %}</title>
+  <meta name="description" content="{% block description %}spritz: il catalogo federato di software per Haiku. Trova app native, sempre dagli autori originali.{% endblock %}">
+  <link rel="stylesheet" href="/static/spritz.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">spritz</a>
+    <form class="search-inline" action="/" method="get">
+      <input type="text" name="q" value="{{ q|default('') }}"
+             placeholder="Cerca un'app per Haiku" aria-label="Cerca">
+      <button type="submit">Cerca</button>
+    </form>
+  </header>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      spritz e' un catalogo che punta agli autori originali. E' additivo a
+      HaikuPorts, non un'alternativa: quando un'app esiste anche li', spritz te
+      lo dice e ti manda alla versione curata.
+    </p>
+  </footer>
+</body>
+</html>

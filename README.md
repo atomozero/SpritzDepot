@@ -22,6 +22,11 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   HaikuDepot. Il rebuild è automatico all'`/ingest` (oppure `POST /repo/build`
   on demand). Un sub-repo per vendor, perché `package_repo` impone che tutti i
   pacchetti di un repo abbiano lo stesso vendor (vedi `docs/DECISIONS.md`).
+- **Frontend web (server-rendered, in italiano).** Home con ricerca, pagina
+  app con i canali, la nota bridge HaikuPorts e il bottone che degrada: prova a
+  contattare il client nativo (`spritz://` in un clic) e altrimenti offre il
+  repository da aggiungere in HaikuDepot. Template Jinja leggeri, pensati per
+  WebPositive.
 
 ## Avvio
 
@@ -32,7 +37,8 @@ uvicorn app.main:app --reload  # poi apri http://localhost:8000/docs
 ```
 
 `python test_flow.py` esercita l'intero flusso in-process senza rete.
-`python test_security.py` verifica il gate admin su `/ingest` e il blocco prod.
+`python test_security.py` verifica auth, rate-limit, validazione e blocco prod.
+`python test_frontend.py` controlla il rendering delle pagine.
 `SPRITZ_PACKAGE_REPO_BIN=... python test_repo_proxy.py` prova il repo-proxy end
 to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 
@@ -64,7 +70,9 @@ app/
   auth.py        bcrypt + JWT
   ingest.py      crawl bàcaro (git o cartella) → cache
   repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
-  main.py        route FastAPI
+  main.py        route FastAPI (API + frontend)
+  templates/     pagine Jinja (home, app, get-spritz)
+  static/        CSS + JS del frontend (degrading button)
 sample-bacaro/   cichéto d'esempio (Genio)
 ```
 
@@ -89,14 +97,16 @@ sample-bacaro/   cichéto d'esempio (Genio)
 
 ## Prossimi passi (non in v1)
 
-1. **Frontend web** del catalogo (la vetrina vera, con bottone che degrada:
-   `spritz://` se il demone c'è, altrimenti bootstrap hpkg).
-2. **Demone Haiku** che consuma `/library/pending` — chiude il cerchio Play Store.
-3. **Crawler GitHub release** per i canali `ombra` (github-latest + pattern match).
-4. **Tier di fiducia, firma manifest, transparency log** — fuori dal cichéto,
+1. **Demone Haiku** che consuma `/library/pending` — chiude il cerchio Play Store.
+2. **Crawler GitHub release** per i canali `ombra` (github-latest + pattern match).
+3. **Tier di fiducia, firma manifest, transparency log** — fuori dal cichéto,
    asserzioni firmate dell'indice.
-5. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
-6. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
+4. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
+5. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
+
+Da verificare su Haiku reale (non in WSL): rendering del frontend in WebPositive,
+il probe del client nativo e lo schema `spritz://`, e l'aggiunta del repo-proxy
+in HaikuDepot.
 
 ## Note di sicurezza
 

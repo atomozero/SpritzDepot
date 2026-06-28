@@ -3,6 +3,31 @@
 The public face. This is the BeBits piece people will actually land on. It is
 also the SEO funnel: someone searching "app X for Haiku" should arrive here.
 
+## Status: FIRST CUT DONE (pending WebPositive check)
+
+Server-rendered Jinja templates served by FastAPI, plain CSS, tiny vanilla JS.
+Implemented:
+- `GET /` home + search (reuses `_search_rows`, same query as `/search`).
+- `GET /app/{id}` full cichéto page: bridge note, channels, author/packager,
+  screenshots, and the degrading install button.
+- `GET /get-spritz` bootstrap placeholder for the native client.
+- `/static/spritz.css`, `/static/install-button.js`. The JSON service info moved
+  from `/` to `/api`.
+Covered by `test_frontend.py` (renders each page, checks the bridge badge/note,
+the channels, the degrading script, and that templates carry no em dashes).
+
+**The degrading button** is implemented as: the page renders the fallback by
+default (add-repo for stable when a built repo exists, else a neutral note;
+plus a get-spritz link), and `install-button.js` probes the native client on
+`http://127.0.0.1:4242/ping` (XHR, 800ms timeout, old-JS friendly). On a hit it
+prepends a `spritz://install/<id>?channel=<ch>` one-click button. On miss or
+mixed-content block it silently stays on the fallback.
+
+**Still TODO:** render-check in WebPositive (the one step that needs Haiku, not
+WSL); confirm the localhost probe and the `spritz://` scheme behave there; the
+optional logged-in "my apps" page; finalize the native client port/endpoint
+(4242/ping is a placeholder to match whatever the daemon ends up exposing).
+
 ## Scope
 
 A catalog UI over the existing registry API. No new backend logic, it consumes
