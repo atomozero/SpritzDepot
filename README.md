@@ -65,6 +65,7 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | URL pubblico annunciato in `repo.info`. Deve essere raggiungibile da HaikuDepot. |
 | `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
 | `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale per il crawler ombra (alza il rate limit dell'API release). |
+| `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
@@ -100,6 +101,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | POST | `/auth/change-password` · `/auth/logout-all` | account (revoca i token) |
 | GET  | `/publish` | form di pubblicazione (web) |
 | POST | `/publish` | genera cichéto YAML (auth) |
+| POST | `/upload/image` | carica icona/screenshot, ritorna URL (auth) |
+| GET  | `/assets/{file}` | serve un'immagine caricata |
 | GET  | `/library-page` | pagina "le mie app" (web) |
 | POST | `/library/{id}` | accoda install (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |

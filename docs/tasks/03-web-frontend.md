@@ -13,11 +13,15 @@ Implemented:
 - `GET /get-spritz` bootstrap placeholder for the native client.
 - `GET /publish` author form + `POST /publish` (authenticated) that validates
   the fields against the real `Cicheto` schema and returns a clean YAML to drop
-  into the author's bàcaro git. Includes an icon URL field: the cichéto `icon`
-  is a link to the author's own image (spritz hosts nothing); shown on the app
-  page and as a small icon in the search results. Writes nothing server-side (git stays the source
-  of truth); the generated YAML round-trips through ingest. Auth is paste-the-
-  bearer-token (reuses the existing JWT, no cookies).
+  into the author's bàcaro git. Includes an icon URL field and a screenshots
+  list: the cichéto `icon` and `screenshots` are links (shown on the app page;
+  the icon also as a small icon in search results). As a convenience,
+  `POST /upload/image` (authenticated) accepts an icon or screenshot, validates
+  it by magic bytes, size-caps it (2MB icon / 5MB screenshot), stores it
+  content-addressed, and returns a spritz-served `/assets/<hash>.ext` URL to
+  paste in. The cichéto still references images by URL, so git stays canonical
+  (see DECISIONS). Writes no cichéto server-side; the generated YAML round-trips
+  through ingest. Auth is paste-the-bearer-token (reuses the existing JWT).
 - `/static/spritz.css`, `/static/install-button.js`, `/static/publish.js`. The
   JSON service info moved from `/` to `/api`. Corporate navy/grey palette.
 Covered by `test_frontend.py` (renders each page, checks the bridge badge/note,

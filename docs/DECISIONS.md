@@ -145,6 +145,16 @@ later leg). `SPRITZ_GITHUB_TOKEN` raises the API rate limit. Both `/resolve` and
 poll; a live-resolve failure leaves empty artifacts + a note (retry next poll),
 never a hard failure of the whole poll.
 
+**Image upload is a convenience, not a hosting model; the cichéto still uses
+URLs.** Authors may upload an icon/screenshot (`POST /upload/image`) and spritz
+serves it at `/assets/<sha256>.ext`, but the cichéto references images by URL
+either way, so the git + cache model is untouched (an uploaded image's URL is
+just one more URL in the YAML). This is a deliberate, bounded exception to "no
+re-hosting": it covers authors with nowhere to host an image, while binaries
+(hpkg) are still never re-hosted, only proxied with checksums. Uploads are
+strict: image-only by magic bytes (not extension), size-capped (2MB/5MB),
+content-addressed (safe paths, dedup), authenticated, rate-limited.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

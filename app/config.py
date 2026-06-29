@@ -54,6 +54,14 @@ CORS_ORIGINS = [
     ).split(",") if o.strip()
 ]
 
+# Uploaded images (icons, screenshots). A convenience: authors may upload here
+# instead of hosting the image themselves, but the cichéto still references it
+# by URL (served from spritz), so git stays the source of truth. Strict caps.
+UPLOAD_DIR = os.environ.get("SPRITZ_UPLOAD_DIR",
+                            os.path.join(REPO_CACHE_DIR, "assets"))
+MAX_ICON_BYTES = 2 * 1024 * 1024        # 2 MB
+MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5 MB
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.

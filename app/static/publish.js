@@ -7,6 +7,54 @@
   var form = document.getElementById("publish-form");
   if (!form) return;
 
+  // --- image upload helpers (convenience: returns a spritz-served URL) ---
+  function uploadImage(kind, fileInput, statusEl, onUrl) {
+    var token = (document.getElementById("token").value || "").trim();
+    if (!token) { alert("Incolla prima il tuo token di accesso (punto 1)."); return; }
+    var f = fileInput.files && fileInput.files[0];
+    if (!f) { alert("Scegli prima un file immagine."); return; }
+
+    var fd = new FormData();
+    fd.append("file", f);
+    statusEl.textContent = "Caricamento...";
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload/image?kind=" + encodeURIComponent(kind), true);
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status === 200) {
+        var url = JSON.parse(xhr.responseText).url;
+        statusEl.textContent = "Caricata: " + url;
+        onUrl(url);
+      } else if (xhr.status === 401) {
+        statusEl.textContent = "";
+        alert("Token non valido o scaduto.");
+      } else {
+        statusEl.textContent = "";
+        alert("Upload fallito (" + xhr.status + "): " + extractDetail(xhr.responseText));
+      }
+    };
+    xhr.send(fd);
+  }
+
+  var iconBtn = document.getElementById("icon-upload");
+  if (iconBtn) iconBtn.onclick = function () {
+    uploadImage("icon", document.getElementById("icon-file"),
+                document.getElementById("icon-status"), function (url) {
+      form.elements["icon"].value = url;
+    });
+  };
+
+  var shotBtn = document.getElementById("shot-upload");
+  if (shotBtn) shotBtn.onclick = function () {
+    uploadImage("screenshot", document.getElementById("shot-file"),
+                document.getElementById("shot-status"), function (url) {
+      var ta = form.elements["screenshots"];
+      ta.value = (ta.value ? ta.value.replace(/\s+$/, "") + "\n" : "") + url;
+    });
+  };
+
   form.onsubmit = function (e) {
     e.preventDefault();
 

@@ -56,8 +56,21 @@
       <p>
         <label>URL dell'icona (opzionale)<br>
         <input name="icon" placeholder="https://.../icona.png" class="field"></label>
-        <span class="hint">Un link alla tua icona (PNG). spritz non ospita il
-          file, punta al tuo: tienilo dove gia' lo pubblichi.</span>
+        <span class="hint">Un link alla tua icona. Meglio se la tieni dove gia'
+          la pubblichi; in alternativa puoi caricarla qui sotto.</span>
+        <br>
+        <input type="file" id="icon-file" accept="image/*">
+        <button type="button" class="btn btn-fallback" id="icon-upload">Carica icona</button>
+        <span class="hint" id="icon-status"></span>
+      </p>
+      <p>
+        <label>Screenshot (un URL per riga, opzionale)<br>
+        <textarea name="screenshots" class="field" rows="3"
+                  placeholder="https://.../shot1.png&#10;https://.../shot2.png"></textarea></label>
+        <br>
+        <input type="file" id="shot-file" accept="image/*">
+        <button type="button" class="btn btn-fallback" id="shot-upload">Carica screenshot</button>
+        <span class="hint" id="shot-status"></span>
       </p>
       <p>
         <label>Licenza (opzionale)<br>

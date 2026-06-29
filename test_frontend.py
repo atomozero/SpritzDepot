@@ -89,6 +89,33 @@ rep = ingest_directory(_d, "tap")
 assert rep["ingested"] == ["org.test.pub"] and not rep["failed"], rep
 print("publish round-trip -> ok")
 
+# Image upload (convenience) + serving + validation
+import struct as _struct, zlib as _zlib
+def _png():
+    sig = b"\x89PNG\r\n\x1a\n"
+    def chunk(t, d):
+        return _struct.pack(">I", len(d)) + t + d + _struct.pack(">I", _zlib.crc32(t + d) & 0xffffffff)
+    ihdr = _struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    idat = _zlib.compress(b"\x00\xff\x00\x00")
+    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
+_png_bytes = _png()
+_ut = c.post("/auth/register",
+             json={"email": "up@x.io", "password": "longenough1"}).json()["access_token"]
+_ua = {"Authorization": f"Bearer {_ut}"}
+assert c.post("/upload/image?kind=icon",
+              files={"file": ("i.png", _png_bytes, "image/png")}).status_code == 401
+up = c.post("/upload/image?kind=icon",
+            files={"file": ("i.png", _png_bytes, "image/png")}, headers=_ua)
+assert up.status_code == 200, up.text
+served = c.get("/assets/" + up.json()["filename"])
+assert served.status_code == 200 and served.content == _png_bytes
+# a renamed non-image is rejected by magic bytes
+assert c.post("/upload/image?kind=icon",
+              files={"file": ("x.png", b"not an image", "image/png")},
+              headers=_ua).status_code == 400
+assert c.get("/assets/..%2f..%2fspritz.db").status_code in (400, 404)
+print("image upload       -> ok")
+
 # 'My apps' page + library API (name + state)
 lp = c.get("/library-page")
 assert lp.status_code == 200 and 'id="lib-list"' in lp.text

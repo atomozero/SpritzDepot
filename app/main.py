@@ -17,7 +17,8 @@ import secrets
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import (Depends, FastAPI, File, Header, HTTPException, Query,
+                     Request, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
                                RedirectResponse)
@@ -30,7 +31,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import config, ombra, repo_proxy
+from . import config, ombra, repo_proxy, uploads
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
@@ -154,6 +155,7 @@ class PublishBody(BaseModel):
     author_contact: Optional[str] = None
     packager_name: Optional[str] = None
     haikuports: Optional[str] = None        # bridge target
+    screenshots: Optional[str] = None       # newline- or comma-separated URLs
     version: Optional[str] = None
     arch: Optional[str] = None              # e.g. x86_64
     hpkg_url: Optional[str] = None
@@ -644,6 +646,9 @@ def publish_generate(request: Request, body: "PublishBody",
         "homepage": body.homepage or None,
         "license": body.license or None,
         "icon": body.icon or None,
+        "screenshots": [s.strip() for s in
+                        (body.screenshots or "").replace(",", "\n").splitlines()
+                        if s.strip()],
         "categories": [c.strip() for c in (body.categories or "").split(",") if c.strip()],
         "author": {"name": body.author_name,
                    "contact": body.author_contact or None} if body.author_name else None,
@@ -670,6 +675,39 @@ def publish_generate(request: Request, body: "PublishBody",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         media_type="application/x-yaml",
     )
+
+
+# ---------- image uploads (convenience; the cichéto still references by URL) ----
+
+@app.post("/upload/image")
+@limiter.limit("30/minute")
+async def upload_image(request: Request, kind: str = Query("screenshot"),
+                       file: UploadFile = File(...),
+                       user: User = Depends(current_user)):
+    """Upload an icon or screenshot and get back a spritz-served URL to paste
+    into the cichéto. Authenticated. The image is validated by magic bytes and
+    size-capped; it is NOT a substitute for the cichéto (git stays canonical),
+    just a place to host the image if the author has nowhere else."""
+    max_bytes = (config.MAX_ICON_BYTES if kind == "icon"
+                 else config.MAX_SCREENSHOT_BYTES)
+    data = await file.read()
+    try:
+        name = uploads.save_image(data, max_bytes)
+    except uploads.UploadError as e:
+        raise HTTPException(400, str(e))
+    url = f"{config.PUBLIC_BASE_URL.rstrip('/')}/assets/{name}"
+    return {"url": url, "filename": name}
+
+
+@app.get("/assets/{filename}")
+def get_asset(filename: str):
+    try:
+        path = uploads.asset_path(filename)
+    except uploads.UploadError:
+        raise HTTPException(400, "bad asset filename")
+    if not path.is_file():
+        raise HTTPException(404, "asset not found")
+    return FileResponse(path, media_type=uploads.content_type_for(filename))
 
 
 def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:
