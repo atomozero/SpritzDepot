@@ -57,6 +57,7 @@ class Channel(BaseModel):
     requires: list[str] = Field(default_factory=list)
     # for auto-following channels:
     source: Optional[str] = None    # e.g. "github-latest"
+    repo: Optional[str] = None       # "owner/name" for github-latest; else derived from homepage
     match: Optional[str] = None      # asset pattern, e.g. "genio-*-{arch}.hpkg"
     prerelease: bool = False
 

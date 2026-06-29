@@ -30,7 +30,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import config, repo_proxy
+from . import config, ombra, repo_proxy
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
@@ -256,7 +256,13 @@ def resolve(cicheto_id: str,
             channel: str = "stable",
             arch: Optional[str] = None,
             session: Session = Depends(get_session)):
-    """What the Haiku daemon calls: id + channel (+ arch) -> install info."""
+    """What the Haiku daemon calls: id + channel (+ arch) -> install info.
+
+    For a `github-latest` (ombra) channel the artifacts are resolved live
+    against the author's newest GitHub release, with no pre-computed sha256
+    (the client verifies the hash at download). Pinned channels are served from
+    the cichéto as-is.
+    """
     row = session.get(CichetoRow, cicheto_id)
     if not row:
         raise HTTPException(404, "Cichéto not found")
@@ -265,22 +271,54 @@ def resolve(cicheto_id: str,
     if not ch:
         raise HTTPException(404, f"Channel '{channel}' not available")
 
-    artifacts = ch.get("artifacts", {})
-    if arch:
-        art = artifacts.get(arch)
-        if not art:
-            raise HTTPException(404, f"No artifact for arch '{arch}'")
-        artifacts = {arch: art}
+    version = ch.get("version")
+    notes: list = []
+    if ch.get("source") == "github-latest":
+        artifacts, version = _resolve_ombra(row.raw, ch, arch, notes)
+    else:
+        artifacts = ch.get("artifacts", {})
+        if arch:
+            art = artifacts.get(arch)
+            if not art:
+                raise HTTPException(404, f"No artifact for arch '{arch}'")
+            artifacts = {arch: art}
 
-    return {
+    out = {
         "id": row.id,
         "channel": channel,
         "kind": ch.get("kind", "hpkg"),
-        "version": ch.get("version"),
-        "artifacts": artifacts,        # arch -> {url, sha256}
+        "version": version,
+        "artifacts": artifacts,        # arch -> {url[, sha256]}
         "requires": ch.get("requires", []),
         "bridge": row.raw.get("bridge"),
     }
+    if notes:
+        out["notes"] = notes
+    return out
+
+
+def _resolve_ombra(raw: dict, ch: dict, arch: Optional[str],
+                   notes: list) -> tuple[dict, Optional[str]]:
+    """Resolve a github-latest channel to live asset URLs (no sha256)."""
+    repo = ch.get("repo") or ombra.repo_from_homepage(raw.get("homepage"))
+    if not repo:
+        raise HTTPException(
+            422, "ombra channel needs 'repo' (owner/name) or a github homepage")
+    arches = [arch] if arch else list((ch.get("artifacts") or {}).keys())
+    if not arches:
+        # No arch hint anywhere: ask the client to pass ?arch=.
+        raise HTTPException(400, "specify ?arch= for this ombra channel")
+    try:
+        res = ombra.resolve_github_latest(
+            repo, ch.get("match"), arches, prerelease=ch.get("prerelease", False))
+    except ombra.OmbraError as e:
+        raise HTTPException(502, f"ombra resolve failed: {e}")
+    notes.extend(res.notes)
+    # Shape like pinned artifacts but without sha256 (verified at download).
+    artifacts = {a: {"url": url} for a, url in res.artifacts.items()}
+    if arch and arch not in artifacts:
+        raise HTTPException(404, f"no ombra asset for arch '{arch}'")
+    return artifacts, res.version
 
 
 # ---------- library (the queue) ----------

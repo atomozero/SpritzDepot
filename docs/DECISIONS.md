@@ -132,6 +132,16 @@ store is correct for a single worker. Before running multiple workers in prod,
 point it at Redis (`storage_uri`), or limits are per-process and thus looser.
 Recorded so it is not forgotten at deploy time.
 
+**ombra resolves live at /resolve, follows GitHub releases, never builds.**
+`app/ombra.py` resolves a `github-latest` channel against the author's newest
+release (GitHub releases API, prerelease-aware), matching `.hpkg` assets per
+arch by the cichéto `match` pattern. It returns asset URLs with NO sha256: the
+schema and project line say the client verifies the hash at download and logs
+it. The channel may name its repo explicitly (`repo: owner/name`) or have it
+derived from a github.com `homepage`. Only releases that already ship a
+ready-made `.hpkg` are followed; building from source stays out (build-farm,
+later leg). `SPRITZ_GITHUB_TOKEN` raises the API rate limit.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

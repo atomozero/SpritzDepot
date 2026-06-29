@@ -11,6 +11,9 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
 - **Catalogo pubblico.** `/search`, `/cicheto/{id}`.
 - **Account email + password.** `/auth/register`, `/auth/login` (JWT bearer).
 - **Resolve per il demone.** `/resolve/{id}?channel=&arch=` → url + sha256 + requires.
+  Per il canale **ombra** (`source: github-latest`) gli URL sono risolti al volo
+  sull'ultima release GitHub dell'autore, senza sha256 pre-calcolato (il client
+  verifica l'hash al download). È la cosa che un repo HPKR statico non può fare.
 - **Libreria / coda (effetto Play Store).** L'utente accoda da browser
   (`POST /library/{id}`); il demone Haiku fa polling di `/library/pending`,
   installa, poi conferma con `/library/{id}/installed`.
@@ -31,6 +34,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
   scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
   schema dell'ingest, quindi il file generato si re-ingesta sempre pulito.
+- **Canale ombra (segue l'autore).** Per i canali `github-latest`, spritz
+  risolve l'ultima release GitHub dell'autore al volo: trova gli asset .hpkg per
+  arch col pattern del cichéto e ne restituisce gli URL. Non costruisce
+  pacchetti e non pre-calcola l'hash (lo verifica il client al download).
 
 ## Avvio
 
@@ -57,6 +64,7 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_REPO_CACHE` | `packages-cache` | Dir dove il repo-proxy scarica gli hpkg e genera i cataloghi. Fuori dal sorgente, gitignored. |
 | `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | URL pubblico annunciato in `repo.info`. Deve essere raggiungibile da HaikuDepot. |
 | `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
+| `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale per il crawler ombra (alza il rate limit dell'API release). |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
@@ -73,6 +81,7 @@ app/
   config.py      env + gate sicurezza prod (secret, admin token, tool path)
   auth.py        bcrypt + JWT
   ingest.py      crawl bàcaro (git o cartella) → cache
+  ombra.py       resolver canale ombra (ultima release GitHub dell'autore)
   repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
   main.py        route FastAPI (API + frontend)
   templates/     pagine Jinja (home, app, get-spritz)
