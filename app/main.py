@@ -324,8 +324,16 @@ def resolve(cicheto_id: str,
 
     version = ch.get("version")
     notes: list = []
-    if ch.get("source") == "github-latest":
+    source = ch.get("source")
+    if source == "github-latest":
         artifacts, version = _resolve_ombra(row.raw, ch, arch, notes)
+    elif source == "haikuports":
+        # Bridge-only: spritz hosts no artifact; the app is curated in
+        # HaikuPorts. Tell the client to install it from there.
+        artifacts = {}
+        bridge = row.raw.get("bridge") or {}
+        pkg = bridge.get("haikuports") or row.id
+        notes.append(f"install from HaikuPorts: pkgman install {pkg}")
     else:
         artifacts = ch.get("artifacts", {})
         if arch:
@@ -339,6 +347,7 @@ def resolve(cicheto_id: str,
         "channel": channel,
         "kind": ch.get("kind", "hpkg"),
         "version": version,
+        "source": source,
         "artifacts": artifacts,        # arch -> {url[, sha256]}
         "requires": ch.get("requires", []),
         "bridge": row.raw.get("bridge"),

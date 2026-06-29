@@ -38,7 +38,15 @@
       <!-- Default (no native client): the fallback. JS upgrades this to a
            spritz:// deep link if the local client answers. -->
       <div class="install-actions">
-        {% if channel_name == 'stable' and repo_base %}
+        {% if ch.source == 'haikuports' %}
+        <p class="hint">
+          Questa app e' curata in HaikuPorts. Installala da li', e' gia'
+          disponibile in HaikuDepot.
+        </p>
+        {% if app.bridge and app.bridge.haikuports %}
+        <p><code>pkgman install {{ app.bridge.haikuports }}</code></p>
+        {% endif %}
+        {% elif channel_name == 'stable' and repo_base %}
         <a class="btn btn-fallback"
            href="{{ repo_base }}">Aggiungi il repository in HaikuDepot</a>
         <p class="hint">
@@ -56,9 +64,11 @@
           dell'autore e richiede il client spritz nativo.
         </p>
         {% endif %}
+        {% if ch.source != 'haikuports' %}
         <a class="btn btn-bootstrap" href="/get-spritz">
           Installa spritz per aggiornamenti automatici e installazione in un clic
         </a>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

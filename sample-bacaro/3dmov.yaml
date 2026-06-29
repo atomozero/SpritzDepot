@@ -1,0 +1,31 @@
+cicheto: 1
+id: org.haikuarchives.3dmov
+name: 3DMov
+summary: Play movies on 3D objects
+homepage: https://github.com/HaikuArchives/3DMov
+license: MIT
+categories:
+  - multimedia
+  - demos
+
+# Bridge-only cichéto: 3DMov is already curated in HaikuPorts. spritz does not
+# offer a competing download for it; it points users to the HaikuPorts package.
+# This is the additive-to-HaikuPorts case made concrete: spritz says "this
+# exists, install the curated version from there".
+
+author:
+  name: Zenja Solaja
+  contact: https://github.com/HaikuArchives/3DMov
+
+packager:
+  name: spritz sample
+  bacaro: vepro
+
+bridge:
+  haikuports: 3dmov
+  prefer: stable
+
+channels:
+  stable:
+    kind: hpkg
+    source: haikuports   # no spritz-hosted artifact: use the HaikuPorts package

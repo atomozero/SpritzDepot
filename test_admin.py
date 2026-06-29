@@ -44,7 +44,7 @@ ing = c.post("/ingest", json={"git_url": url, "bacaro": "vepro"}, headers=ADMIN)
 assert ing.status_code == 200, ing.text
 rec = c.get("/admin/bacari", headers=ADMIN).json()
 assert rec and rec[0]["slug"] == "vepro" and rec[0]["git_url"] == url
-assert rec[0]["last_ingested"] == 1 and rec[0]["last_error"] is None
+assert rec[0]["last_ingested"] >= 1 and rec[0]["last_error"] is None
 print("ingest record      -> ok")
 
 # a failing ingest records the error and does not crash

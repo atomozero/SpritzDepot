@@ -182,6 +182,15 @@ point at Postgres without code changes). Prod path: `alembic upgrade head` on a
 clean DB, then incremental migrations per model change. Dev keeps using
 create_all for convenience; the two do not conflict (create_all is idempotent).
 
+**Bridge-only cichéti (`source: haikuports`) for apps already in HaikuPorts.**
+An app already curated in HaikuPorts is catalogued without a competing spritz
+download: its stable channel uses `source: haikuports` (no artifacts) plus a
+`bridge`. `/resolve` returns empty artifacts, the bridge, and a note
+(`pkgman install <pkg>`); the app page shows the HaikuPorts install command, not
+the repo/get-spritz buttons. This makes the additive-to-HaikuPorts principle
+concrete: spritz says "this exists, get the curated version there". The
+sample-bàcaro ships 3DMov as the worked example.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure
