@@ -62,6 +62,18 @@
   <ul class="app-list">
     {% for app in results %}{{ app_card(app) }}{% endfor %}
   </ul>
+  {% if pages > 1 %}
+  {% set filt %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if category %}&category={{ category|urlencode }}{% endif %}{% if bacaro %}&bacaro={{ bacaro|urlencode }}{% endif %}{% endset %}
+  <nav class="pager">
+    {% if page > 1 %}
+    <a class="btn btn-fallback" href="/?page={{ page - 1 }}{{ filt }}">&laquo; Precedente</a>
+    {% endif %}
+    <span class="pager-info">Pagina {{ page }} di {{ pages }} ({{ total }} app)</span>
+    {% if page < pages %}
+    <a class="btn btn-fallback" href="/?page={{ page + 1 }}{{ filt }}">Successiva &raquo;</a>
+    {% endif %}
+  </nav>
+  {% endif %}
   {% elif q or category or bacaro %}
   <p class="empty">Nessun risultato. <a href="/">Azzera i filtri</a> e riprova.</p>
   {% else %}

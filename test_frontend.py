@@ -43,10 +43,13 @@ print("search             -> ok")
 # Categories + filters
 cats = c.get("/api/categories").json()
 assert {"category": "editors", "count": 1} in cats, cats
-assert [a["id"] for a in c.get("/search?category=development").json()] == ["org.haiku.genio"]
-assert c.get("/search?category=dev").json() == [], "partial category must not match"
-assert [a["id"] for a in c.get("/search?bacaro=vepro").json()] == ["org.haiku.genio"]
-assert c.get("/search?bacaro=nope").json() == []
+assert [a["id"] for a in c.get("/search?category=development").json()["results"]] == ["org.haiku.genio"]
+assert c.get("/search?category=dev").json()["results"] == [], "partial category must not match"
+assert [a["id"] for a in c.get("/search?bacaro=vepro").json()["results"]] == ["org.haiku.genio"]
+assert c.get("/search?bacaro=nope").json()["results"] == []
+# pagination shape
+_pg = c.get("/search?limit=1&offset=0").json()
+assert _pg["limit"] == 1 and "total" in _pg and len(_pg["results"]) <= 1, _pg
 catpg = c.get("/categories")
 assert catpg.status_code == 200 and "editors" in catpg.text
 hf = c.get("/?category=editors").text

@@ -102,7 +102,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 
 | Metodo | Path | Per chi |
 |---|---|---|
-| GET  | `/search?q=&category=&bacaro=` | catalogo web (con filtri) |
+| GET  | `/search?q=&category=&bacaro=&limit=&offset=` | catalogo (filtri + paginazione, ritorna `{total, results}`) |
 | GET  | `/api/categories` | categorie con conteggi |
 | GET  | `/bacari` | bàcari noti (conteggi, ultimo ingest) |
 | GET  | `/health` | liveness/readiness (503 se il DB non risponde) |

@@ -170,6 +170,10 @@ a.badge-bacaro:hover { background: #e2e8f0; }
 .btn-deeplink:hover { background: #15803d; border-color: #166534; }
 .hint { color: #64748b; font-size: 14px; margin: 4px 0 10px; }
 
+/* Pager. */
+.pager { margin: 18px 0; display: flex; align-items: center; gap: 12px; }
+.pager-info { color: #64748b; font-size: 14px; }
+
 /* Admin table. */
 .admin-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
 .admin-table th, .admin-table td {

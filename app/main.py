@@ -219,10 +219,12 @@ def logout_all(user: User = Depends(current_user),
 
 # ---------- public catalog ----------
 
-def _search_rows(session: Session, q: str = "", category: str = "",
-                 bacaro: str = "") -> list[dict]:
-    """Shared search used by both the JSON API and the HTML home. Optional
-    exact-match filters by category and bàcaro."""
+PAGE_SIZE = 24
+MAX_PAGE_SIZE = 100
+
+
+def _search_query(q: str, category: str, bacaro: str):
+    """Build the filtered select (no limit/offset)."""
     stmt = select(CichetoRow)
     if q:
         like = f"%{q}%"
@@ -239,22 +241,38 @@ def _search_rows(session: Session, q: str = "", category: str = "",
         )
     if bacaro:
         stmt = stmt.where(CichetoRow.bacaro == bacaro)
-    rows = session.exec(stmt.limit(50)).all()
-    return [
-        {"id": r.id, "name": r.name, "summary": r.summary,
-         "bacaro": r.bacaro, "channels": r.channels.split(",") if r.channels else [],
-         "haikuports": r.haikuports,
-         "categories": r.categories.split(",") if r.categories else [],
-         "icon": (r.raw or {}).get("icon")}
-        for r in rows
-    ]
+    return stmt
+
+
+def _row_dict(r: CichetoRow) -> dict:
+    return {"id": r.id, "name": r.name, "summary": r.summary,
+            "bacaro": r.bacaro,
+            "channels": r.channels.split(",") if r.channels else [],
+            "haikuports": r.haikuports,
+            "categories": r.categories.split(",") if r.categories else [],
+            "icon": (r.raw or {}).get("icon")}
+
+
+def _search_rows(session: Session, q: str = "", category: str = "",
+                 bacaro: str = "", limit: int = PAGE_SIZE,
+                 offset: int = 0) -> tuple[list[dict], int]:
+    """Filtered, paginated search. Returns (rows, total). Shared by the JSON API
+    and the HTML home."""
+    base = _search_query(q, category, bacaro)
+    total = len(session.exec(base).all())
+    rows = session.exec(base.order_by(CichetoRow.name)
+                        .offset(offset).limit(limit)).all()
+    return [_row_dict(r) for r in rows], total
 
 
 @app.get("/search")
 def search(q: str = Query("", description="free-text query"),
            category: str = Query(""), bacaro: str = Query(""),
+           limit: int = Query(PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+           offset: int = Query(0, ge=0),
            session: Session = Depends(get_session)):
-    return _search_rows(session, q, category, bacaro)
+    rows, total = _search_rows(session, q, category, bacaro, limit, offset)
+    return {"total": total, "limit": limit, "offset": offset, "results": rows}
 
 
 def _category_counts(session: Session) -> list[dict]:
@@ -638,12 +656,17 @@ def repo_package(vendor: str, arch: str, filename: str):
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, q: str = Query(""), category: str = Query(""),
-         bacaro: str = Query(""), session: Session = Depends(get_session)):
+         bacaro: str = Query(""), page: int = Query(1, ge=1),
+         session: Session = Depends(get_session)):
     """Catalog home + search, optionally filtered by category or bàcaro."""
-    results = _search_rows(session, q, category, bacaro)
+    offset = (page - 1) * PAGE_SIZE
+    results, total = _search_rows(session, q, category, bacaro,
+                                  limit=PAGE_SIZE, offset=offset)
+    pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
     return templates.TemplateResponse(
         request, "home.html",
-        {"q": q, "category": category, "bacaro": bacaro, "results": results}
+        {"q": q, "category": category, "bacaro": bacaro, "results": results,
+         "total": total, "page": page, "pages": pages}
     )
 
 
