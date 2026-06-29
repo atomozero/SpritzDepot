@@ -45,6 +45,9 @@ Pages:
   packager, the bridge note ("also on HaikuPorts, use the curated version
   there") when present. Calls `GET /cicheto/{id}`.
 - **Account** (optional, behind login): "my apps" / library. Calls `/library`.
+  DONE: `GET /library-page` + `library.js` (paste-the-token, fetches `/library`,
+  renders name + channel + arch + state). `/library` now also returns the app's
+  display name, not just the id.
 
 ## The degrading install button (important)
 

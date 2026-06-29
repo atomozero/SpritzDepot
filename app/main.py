@@ -355,8 +355,13 @@ def my_library(user: User = Depends(current_user),
     rows = session.exec(
         select(InstallState).where(InstallState.user_id == user.id)
     ).all()
-    return [{"cicheto": r.cicheto_id, "channel": r.channel,
-             "arch": r.arch, "state": r.state} for r in rows]
+    out = []
+    for r in rows:
+        cic = session.get(CichetoRow, r.cicheto_id)
+        out.append({"cicheto": r.cicheto_id,
+                    "name": cic.name if cic else r.cicheto_id,
+                    "channel": r.channel, "arch": r.arch, "state": r.state})
+    return out
 
 
 @app.get("/library/pending")
@@ -576,6 +581,13 @@ def app_page(request: Request, cicheto_id: str,
 def get_spritz(request: Request):
     """Placeholder bootstrap page for the native client (built later)."""
     return templates.TemplateResponse(request, "get_spritz.html", {})
+
+
+@app.get("/library-page", response_class=HTMLResponse)
+def library_page(request: Request):
+    """'My apps' page: the user pastes their token; JS fetches /library and
+    renders the list. Reuses the existing JWT auth (no cookies)."""
+    return templates.TemplateResponse(request, "library.html", {})
 
 
 @app.get("/publish", response_class=HTMLResponse)

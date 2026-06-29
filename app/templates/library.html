@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Le mie app - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail">
+  <h1>Le mie app</h1>
+  <p class="lead">
+    Le app che hai messo in libreria. Quando il client spritz nativo e' attivo,
+    le installa e ne aggiorna lo stato (in coda, installata).
+  </p>
+
+  <section class="install">
+    <h2>Accedi</h2>
+    <p class="hint">
+      Incolla il tuo token di accesso (lo ottieni con <code>/auth/login</code>).
+    </p>
+    <p>
+      <input type="text" id="token" placeholder="token di accesso"
+             class="field" style="max-width:520px;">
+      <button id="load" class="btn">Mostra le mie app</button>
+    </p>
+  </section>
+
+  <section class="install" id="result" style="display:none;">
+    <h2>Libreria</h2>
+    <ul class="app-list" id="lib-list"></ul>
+    <p class="empty" id="lib-empty" style="display:none;">
+      La tua libreria e' vuota. Sfoglia il <a href="/">catalogo</a> e aggiungi
+      un'app.
+    </p>
+  </section>
+</article>
+
+<script src="/static/library.js"></script>
+{% endblock %}

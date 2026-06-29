@@ -84,6 +84,20 @@ rep = ingest_directory(_d, "tap")
 assert rep["ingested"] == ["org.test.pub"] and not rep["failed"], rep
 print("publish round-trip -> ok")
 
+# 'My apps' page + library API (name + state)
+lp = c.get("/library-page")
+assert lp.status_code == 200 and 'id="lib-list"' in lp.text
+assert c.get("/static/library.js").status_code == 200
+_lt = c.post("/auth/register",
+             json={"email": "libtest@x.io", "password": "longenough1"}).json()["access_token"]
+_la = {"Authorization": f"Bearer {_lt}"}
+assert c.get("/library", headers=_la).json() == [], "new user library is empty"
+c.post("/library/org.haiku.genio", json={"channel": "stable", "arch": "x86_64"},
+       headers=_la)
+lib = c.get("/library", headers=_la).json()
+assert lib and lib[0]["name"] == "Genio" and lib[0]["state"] == "pending", lib
+print("my-apps library    -> ok")
+
 # Italian copy + no em dashes in templates (project rule)
 for tmpl in Path("app/templates").glob("*.html"):
     assert "—" not in tmpl.read_text(), f"em dash found in {tmpl.name}"

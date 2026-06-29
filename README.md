@@ -100,6 +100,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | POST | `/auth/change-password` · `/auth/logout-all` | account (revoca i token) |
 | GET  | `/publish` | form di pubblicazione (web) |
 | POST | `/publish` | genera cichéto YAML (auth) |
+| GET  | `/library-page` | pagina "le mie app" (web) |
 | POST | `/library/{id}` | accoda install (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |
