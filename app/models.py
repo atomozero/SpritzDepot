@@ -43,6 +43,20 @@ class User(SQLModel, table=True):
     token_version: int = Field(default=0)
 
 
+class Bacaro(SQLModel, table=True):
+    """Operational record of a tap that has been ingested: its git URL and the
+    last crawl outcome. Not a source of truth (the git repo is); just so the
+    admin page can list and re-crawl taps without re-typing the URL."""
+    __tablename__ = "bacari"
+
+    slug: str = Field(primary_key=True)
+    git_url: str = ""
+    last_ingested_at: Optional[datetime] = None
+    last_ingested: int = 0           # how many cichéti on the last crawl
+    last_removed: int = 0            # how many pruned on the last crawl
+    last_error: Optional[str] = None
+
+
 class InstallState(SQLModel, table=True):
     """A user's library entry — the 'Play Store' queue.
 

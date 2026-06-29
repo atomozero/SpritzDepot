@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Admin - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail">
+  <h1>Amministrazione</h1>
+  <p class="lead">
+    Gestisci i bacari del registro: ingest, ri-crawl, e rebuild dei repository
+    HaikuDepot. Ogni azione richiede il token admin.
+  </p>
+
+  <section class="install">
+    <h2>Token admin</h2>
+    <p>
+      <input type="password" id="admin-token" placeholder="X-Admin-Token"
+             class="field" style="max-width:520px;">
+    </p>
+  </section>
+
+  <section class="install">
+    <h2>Ingest di un bacaro</h2>
+    <p>
+      <label>URL git<br>
+      <input id="ing-url" class="field" placeholder="https://github.com/utente/tap.git"></label>
+    </p>
+    <p>
+      <label>Slug del bacaro<br>
+      <input id="ing-slug" class="field" placeholder="utente-tap"></label>
+    </p>
+    <p>
+      <button id="ing-btn" class="btn">Ingest</button>
+      <span class="hint" id="ing-status"></span>
+    </p>
+    <pre id="ing-result" style="display:none;background:#0f172a;color:#e2e8f0;padding:12px;overflow:auto;border-radius:6px;"></pre>
+  </section>
+
+  <section class="install">
+    <h2>Bacari noti</h2>
+    <p>
+      <button id="refresh-btn" class="btn btn-fallback">Aggiorna elenco</button>
+      <button id="rebuild-btn" class="btn btn-fallback">Rebuild repo HaikuDepot</button>
+      <span class="hint" id="admin-status"></span>
+    </p>
+    <table id="bacari-table" class="admin-table" style="display:none;">
+      <thead>
+        <tr><th>slug</th><th>URL git</th><th>ultimo ingest</th><th>app</th><th>rimossi</th><th></th></tr>
+      </thead>
+      <tbody id="bacari-body"></tbody>
+    </table>
+    <p class="empty" id="bacari-empty" style="display:none;">Nessun bacaro registrato.</p>
+  </section>
+</article>
+
+<script src="/static/admin.js"></script>
+{% endblock %}

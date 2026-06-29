@@ -16,7 +16,12 @@ engine = create_engine(
 
 
 def init_db() -> None:
-    """Create tables. Called once at startup."""
+    """Create tables. Called once at startup.
+
+    Import models first so every table is registered on SQLModel.metadata
+    before create_all, regardless of import order at the call site.
+    """
+    from . import models  # noqa: F401  (registers tables as a side effect)
     SQLModel.metadata.create_all(engine)
 
 

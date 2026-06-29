@@ -38,6 +38,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
   scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
   schema dell'ingest, quindi il file generato si re-ingesta sempre pulito.
+- **Pagina admin** (`/admin`). Incolli il token admin e gestisci i bàcari dal
+  web: ingest, ri-crawl in un clic (l'URL git resta memorizzato), rebuild dei
+  repo HaikuDepot, elenco con esito dell'ultimo crawl. La pagina è visibile ma
+  inerte senza token; ogni azione è verificata dal server.
 - **Canale ombra (segue l'autore).** Per i canali `github-latest`, spritz
   risolve l'ultima release GitHub dell'autore al volo: trova gli asset .hpkg per
   arch col pattern del cichéto e ne restituisce gli URL. Non costruisce
@@ -116,6 +120,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/library` | "le mie app" (auth) |
 | POST | `/ingest` | crawl bàcaro + auto-rebuild repo (admin, `X-Admin-Token`) |
 | POST | `/repo/build` | rebuild completo dei sub-repo HaikuDepot (admin) |
+| GET  | `/admin` | pagina admin (web) |
+| GET  | `/admin/bacari` | bàcari memorizzati con URL ed esito (admin) |
 | GET  | `/repo/{vendor}/{arch}/current/repo.info` | HaikuDepot |
 | GET  | `/repo/{vendor}/{arch}/current/repo` | HaikuDepot (catalogo HPKR) |
 | GET  | `/repo/{vendor}/{arch}/current/packages/{file}` | HaikuDepot (hpkg) |

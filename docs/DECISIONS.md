@@ -164,6 +164,22 @@ another tap's slug and get another tap's rows pruned or hijacked. `/bacari`
 lists known taps with counts and last-ingest. `prune=False` is available for
 batch/partial ingests.
 
+**Admin page reuses the admin token; a Bacaro table records taps.** `/admin` is
+served to anyone but inert without the token; every action posts the token as
+`X-Admin-Token` and is verified server-side (same gate as `/ingest`). A small
+`Bacaro` table (slug, git_url, last crawl outcome) is upserted on each ingest so
+the page can list taps and re-crawl them without re-typing the URL. It is an
+operational record, not a source of truth (the git repo still is). `init_db`
+now imports models before create_all so new tables register regardless of
+import order.
+
+**Schema evolution is create_all-only for now (no migrations).** `create_all`
+adds missing *tables* (so new ones like `bacari` appear), but does NOT add
+*columns* to existing tables. New columns on existing models (e.g. User
+`token_version`) only land on a fresh DB. For SQLite dev this is fine; before a
+long-lived prod DB, add Alembic (or equivalent) migrations. Recorded so it is
+not forgotten at deploy time.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

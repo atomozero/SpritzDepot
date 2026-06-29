@@ -170,6 +170,15 @@ a.badge-bacaro:hover { background: #e2e8f0; }
 .btn-deeplink:hover { background: #15803d; border-color: #166534; }
 .hint { color: #64748b; font-size: 14px; margin: 4px 0 10px; }
 
+/* Admin table. */
+.admin-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+.admin-table th, .admin-table td {
+  text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+.admin-table th { color: #475569; font-weight: 600; }
+.admin-table td .btn { padding: 4px 10px; font-size: 13px; margin: 0; }
+
 /* Publish form fields. */
 .field {
   width: 100%;

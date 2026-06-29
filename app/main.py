@@ -37,7 +37,7 @@ from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
 from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_git, list_bacari
-from .models import CichetoRow, InstallState, User
+from .models import Bacaro, CichetoRow, InstallState, User
 from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
@@ -479,7 +479,12 @@ def ingest(request: Request, body: IngestBody, rebuild: bool = True,
     try:
         result = ingest_git(body.git_url, body.bacaro)
     except Exception as e:
+        _record_bacaro(session, body.bacaro, body.git_url, error=str(e))
         raise HTTPException(400, f"Ingest failed: {e}")
+
+    _record_bacaro(session, body.bacaro, body.git_url,
+                   ingested=len(result.get("ingested", [])),
+                   removed=len(result.get("removed", [])))
 
     if rebuild:
         try:
@@ -487,6 +492,32 @@ def ingest(request: Request, body: IngestBody, rebuild: bool = True,
         except repo_proxy.ToolUnavailable:
             result = {**result, "repo": {"skipped": "package_repo not configured"}}
     return result
+
+
+def _record_bacaro(session: Session, slug: str, git_url: str,
+                   ingested: int = 0, removed: int = 0,
+                   error: Optional[str] = None) -> None:
+    """Upsert the operational record for a tap after a crawl."""
+    from datetime import datetime
+    row = session.get(Bacaro, slug) or Bacaro(slug=slug)
+    row.git_url = git_url or row.git_url
+    row.last_ingested_at = datetime.utcnow()
+    row.last_ingested = ingested
+    row.last_removed = removed
+    row.last_error = error
+    session.add(row)
+    session.commit()
+
+
+@app.get("/admin/bacari", dependencies=[Depends(require_admin)])
+def admin_bacari(session: Session = Depends(get_session)):
+    """Admin: stored taps with their git URL and last crawl outcome."""
+    rows = session.exec(select(Bacaro)).all()
+    return [{"slug": r.slug, "git_url": r.git_url,
+             "last_ingested_at": r.last_ingested_at.isoformat() if r.last_ingested_at else None,
+             "last_ingested": r.last_ingested, "last_removed": r.last_removed,
+             "last_error": r.last_error}
+            for r in sorted(rows, key=lambda x: x.slug)]
 
 
 @app.get("/bacari")
@@ -645,6 +676,14 @@ def app_page(request: Request, cicheto_id: str,
 def get_spritz(request: Request):
     """Placeholder bootstrap page for the native client (built later)."""
     return templates.TemplateResponse(request, "get_spritz.html", {})
+
+
+@app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+def admin_page(request: Request):
+    """Admin page: paste the admin token, ingest/re-crawl taps, rebuild repos.
+    The page is served to anyone but inert without the token; every action is
+    verified server-side against SPRITZ_ADMIN_TOKEN."""
+    return templates.TemplateResponse(request, "admin.html", {})
 
 
 @app.get("/library-page", response_class=HTMLResponse)
