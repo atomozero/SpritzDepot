@@ -109,6 +109,9 @@ a { color: #2563eb; }
 }
 .app-card:hover { border-color: #cbd5e1; }
 .app-link { text-decoration: none; color: inherit; display: block; }
+.app-link-row { display: flex; align-items: center; }
+.app-icon-sm { margin-right: 12px; border-radius: 6px; flex: 0 0 auto; }
+.app-link-text { display: block; }
 .app-name { font-size: 17px; font-weight: 700; color: #2563eb; }
 .app-summary { display: block; color: #475569; margin-top: 2px; }
 .app-meta { margin-top: 10px; }

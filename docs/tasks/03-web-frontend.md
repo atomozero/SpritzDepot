@@ -13,7 +13,9 @@ Implemented:
 - `GET /get-spritz` bootstrap placeholder for the native client.
 - `GET /publish` author form + `POST /publish` (authenticated) that validates
   the fields against the real `Cicheto` schema and returns a clean YAML to drop
-  into the author's bàcaro git. Writes nothing server-side (git stays the source
+  into the author's bàcaro git. Includes an icon URL field: the cichéto `icon`
+  is a link to the author's own image (spritz hosts nothing); shown on the app
+  page and as a small icon in the search results. Writes nothing server-side (git stays the source
   of truth); the generated YAML round-trips through ingest. Auth is paste-the-
   bearer-token (reuses the existing JWT, no cookies).
 - `/static/spritz.css`, `/static/install-button.js`, `/static/publish.js`. The

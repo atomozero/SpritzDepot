@@ -72,9 +72,14 @@ form = {"id": "org.test.pub", "name": "Pub", "summary": "test",
 assert c.post("/publish", json=form).status_code == 401, "publish must require auth"
 _tok = c.post("/auth/register",
               json={"email": "pubtest@x.io", "password": "longenough1"}).json()["access_token"]
-gen = c.post("/publish", json=form, headers={"Authorization": f"Bearer {_tok}"})
+form_icon = dict(form, icon="https://example.org/icon.png")
+gen = c.post("/publish", json=form_icon, headers={"Authorization": f"Bearer {_tok}"})
 assert gen.status_code == 200, gen.text
 assert "org.test.pub.yaml" in gen.headers.get("content-disposition", "")
+assert "icon: https://example.org/icon.png" in gen.text, "icon URL should be in the YAML"
+# a bad icon URL is rejected by the schema
+assert c.post("/publish", json=dict(form, icon="not-a-url"),
+              headers={"Authorization": f"Bearer {_tok}"}).status_code == 422
 # Round-trip: the generated YAML must ingest cleanly.
 import tempfile, yaml as _yaml
 from app.ingest import ingest_directory

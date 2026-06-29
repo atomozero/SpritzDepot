@@ -1,6 +1,31 @@
 {% extends "base.html" %}
 {% block title %}spritz: catalogo software per Haiku{% endblock %}
 
+{% macro app_card(app) %}
+<li class="app-card">
+  <a class="app-link app-link-row" href="/app/{{ app.id }}">
+    {% if app.icon %}
+    <img class="app-icon-sm" src="{{ app.icon }}" alt="" width="40" height="40">
+    {% endif %}
+    <span class="app-link-text">
+      <span class="app-name">{{ app.name }}</span>
+      <span class="app-summary">{{ app.summary }}</span>
+    </span>
+  </a>
+  <div class="app-meta">
+    <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
+    {% for ch in app.channels %}
+    <span class="badge badge-channel">{{ ch }}</span>
+    {% endfor %}
+    {% if app.haikuports %}
+    <span class="badge badge-bridge" title="Disponibile anche su HaikuPorts">
+      anche su HaikuPorts
+    </span>
+    {% endif %}
+  </div>
+</li>
+{% endmacro %}
+
 {% block content %}
 <section class="hero">
   <h1>Il catalogo del software per Haiku</h1>
@@ -16,61 +41,16 @@
   </form>
 </section>
 
-{% if q %}
 <section class="results">
-  <h2>Risultati per "{{ q }}"</h2>
+  <h2>{% if q %}Risultati per "{{ q }}"{% else %}Sfoglia{% endif %}</h2>
   {% if results %}
   <ul class="app-list">
-    {% for app in results %}
-    <li class="app-card">
-      <a class="app-link" href="/app/{{ app.id }}">
-        <span class="app-name">{{ app.name }}</span>
-        <span class="app-summary">{{ app.summary }}</span>
-      </a>
-      <div class="app-meta">
-        <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
-        {% for ch in app.channels %}
-        <span class="badge badge-channel">{{ ch }}</span>
-        {% endfor %}
-        {% if app.haikuports %}
-        <span class="badge badge-bridge" title="Disponibile anche su HaikuPorts">
-          anche su HaikuPorts
-        </span>
-        {% endif %}
-      </div>
-    </li>
-    {% endfor %}
+    {% for app in results %}{{ app_card(app) }}{% endfor %}
   </ul>
-  {% else %}
+  {% elif q %}
   <p class="empty">Nessun risultato. Prova con un altro termine.</p>
-  {% endif %}
-</section>
-{% else %}
-<section class="results">
-  <h2>Sfoglia</h2>
-  {% if results %}
-  <ul class="app-list">
-    {% for app in results %}
-    <li class="app-card">
-      <a class="app-link" href="/app/{{ app.id }}">
-        <span class="app-name">{{ app.name }}</span>
-        <span class="app-summary">{{ app.summary }}</span>
-      </a>
-      <div class="app-meta">
-        <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
-        {% for ch in app.channels %}
-        <span class="badge badge-channel">{{ ch }}</span>
-        {% endfor %}
-        {% if app.haikuports %}
-        <span class="badge badge-bridge">anche su HaikuPorts</span>
-        {% endif %}
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
   {% else %}
   <p class="empty">Il catalogo e' ancora vuoto.</p>
   {% endif %}
 </section>
-{% endif %}
 {% endblock %}

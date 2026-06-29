@@ -148,6 +148,7 @@ class PublishBody(BaseModel):
     bacaro: str
     homepage: Optional[str] = None
     license: Optional[str] = None
+    icon: Optional[str] = None              # URL to the app icon (PNG/HVIF)
     categories: Optional[str] = None        # comma-separated
     author_name: Optional[str] = None
     author_contact: Optional[str] = None
@@ -230,7 +231,8 @@ def _search_rows(session: Session, q: str) -> list[dict]:
     return [
         {"id": r.id, "name": r.name, "summary": r.summary,
          "bacaro": r.bacaro, "channels": r.channels.split(",") if r.channels else [],
-         "haikuports": r.haikuports}
+         "haikuports": r.haikuports,
+         "icon": (r.raw or {}).get("icon")}
         for r in rows
     ]
 
@@ -641,6 +643,7 @@ def publish_generate(request: Request, body: "PublishBody",
         "summary": body.summary,
         "homepage": body.homepage or None,
         "license": body.license or None,
+        "icon": body.icon or None,
         "categories": [c.strip() for c in (body.categories or "").split(",") if c.strip()],
         "author": {"name": body.author_name,
                    "contact": body.author_contact or None} if body.author_name else None,
