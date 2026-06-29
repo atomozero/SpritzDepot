@@ -7,6 +7,11 @@
   var form = document.getElementById("publish-form");
   if (!form) return;
 
+  // Prefill the token from the stored login, if any (no manual paste needed).
+  if (window.spritzAuth && window.spritzAuth.getToken()) {
+    document.getElementById("token").value = window.spritzAuth.getToken();
+  }
+
   // --- image upload helpers (convenience: returns a spritz-served URL) ---
   function uploadImage(kind, fileInput, statusEl, onUrl) {
     var token = (document.getElementById("token").value || "").trim();

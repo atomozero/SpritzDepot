@@ -6,6 +6,7 @@
   <title>{% block title %}spritz{% endblock %}</title>
   <meta name="description" content="{% block description %}spritz: il catalogo federato di software per Haiku. Trova app native, sempre dagli autori originali.{% endblock %}">
   <link rel="stylesheet" href="/static/spritz.css">
+  <script src="/static/auth.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -19,6 +20,9 @@
     <a class="header-link" href="/library-page">Le mie app</a>
     <a class="header-link" href="/publish">Pubblica</a>
     <a class="header-link" href="/admin">Admin</a>
+    <span class="header-link" id="nav-who" style="display:none;"></span>
+    <a class="header-link" id="nav-login" href="/login">Accedi</a>
+    <a class="header-link" id="nav-logout" href="#" style="display:none;">Esci</a>
   </header>
 
   <main class="content">

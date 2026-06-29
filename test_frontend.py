@@ -70,6 +70,15 @@ print("app page           -> ok")
 assert c.get("/app/does.not.exist").status_code == 404
 print("missing app 404    -> ok")
 
+# Login page + shared auth.js wired into every page
+lg = c.get("/login")
+assert lg.status_code == 200 and 'id="auth-form"' in lg.text
+assert c.get("/static/auth.js").status_code == 200
+assert c.get("/static/login.js").status_code == 200
+assert "/static/auth.js" in c.get("/").text, "auth.js must load on every page"
+assert 'id="nav-login"' in c.get("/").text, "header must have a login link"
+print("login page         -> ok")
+
 # Static + bootstrap + api
 assert c.get("/static/spritz.css").status_code == 200
 js = c.get("/static/install-button.js")

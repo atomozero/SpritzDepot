@@ -12,9 +12,15 @@
     removed: "rimossa"
   };
 
+  // Prefill the token field from the stored login, if any.
+  if (window.spritzAuth && window.spritzAuth.getToken()) {
+    document.getElementById("token").value = window.spritzAuth.getToken();
+  }
+
   btn.onclick = function () {
-    var token = (document.getElementById("token").value || "").trim();
-    if (!token) { alert("Incolla prima il tuo token di accesso."); return; }
+    var token = (document.getElementById("token").value || "").trim() ||
+                (window.spritzAuth ? window.spritzAuth.getToken() : "");
+    if (!token) { alert("Accedi prima (link Accedi in alto)."); return; }
 
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/library", true);
@@ -31,6 +37,11 @@
     };
     xhr.send();
   };
+
+  // If already logged in, load automatically on open.
+  if (window.spritzAuth && window.spritzAuth.getToken()) {
+    btn.click();
+  }
 
   function render(items) {
     var list = document.getElementById("lib-list");

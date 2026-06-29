@@ -38,6 +38,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
   scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
   schema dell'ingest, quindi il file generato si re-ingesta sempre pulito.
+- **Login nel browser** (`/login`). Form accedi/registrati: il sito chiama
+  `/auth/login` o `/auth/register`, salva il JWT in localStorage e lo allega da
+  solo alle pagine protette (libreria, pubblica). Niente piu' token da incollare;
+  l'header mostra "Accedi" o l'email con "Esci".
 - **Pagina admin** (`/admin`). Incolli il token admin e gestisci i bàcari dal
   web: ingest, ri-crawl in un clic (l'URL git resta memorizzato), rebuild dei
   repo HaikuDepot, elenco con esito dell'ultimo crawl. La pagina è visibile ma
@@ -116,6 +120,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | POST | `/publish` | genera cichéto YAML (auth) |
 | POST | `/upload/image` | carica icona/screenshot, ritorna URL (auth) |
 | GET  | `/assets/{file}` | serve un'immagine caricata |
+| GET  | `/login` | pagina di accesso/registrazione (web) |
 | GET  | `/library-page` | pagina "le mie app" (web) |
 | POST | `/library/{id}` | accoda install (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |

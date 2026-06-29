@@ -709,6 +709,13 @@ def admin_page(request: Request):
     return templates.TemplateResponse(request, "admin.html", {})
 
 
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    """Browser login/registration. The form calls /auth/login or
+    /auth/register and stores the JWT client-side (see static/auth.js)."""
+    return templates.TemplateResponse(request, "login.html", {})
+
+
 @app.get("/library-page", response_class=HTMLResponse)
 def library_page(request: Request):
     """'My apps' page: the user pastes their token; JS fetches /library and

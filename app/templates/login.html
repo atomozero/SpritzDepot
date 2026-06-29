@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Accedi - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail" style="max-width:460px;">
+  <h1>Accedi</h1>
+  <p class="lead">
+    Entra per gestire la tua libreria e pubblicare le tue app. Se non hai un
+    account, registrane uno: basta una email e una password.
+  </p>
+
+  <section class="install">
+    <form id="auth-form">
+      <p>
+        <label>Email<br>
+        <input type="email" name="email" required class="field" autocomplete="username"></label>
+      </p>
+      <p>
+        <label>Password<br>
+        <input type="password" name="password" required class="field"
+               autocomplete="current-password" minlength="8"></label>
+        <span class="hint">Almeno 8 caratteri.</span>
+      </p>
+      <p>
+        <button type="submit" class="btn" id="btn-login">Accedi</button>
+        <button type="button" class="btn btn-fallback" id="btn-register">Registrati</button>
+        <span class="hint" id="auth-status"></span>
+      </p>
+    </form>
+  </section>
+</article>
+
+<script src="/static/login.js"></script>
+{% endblock %}
