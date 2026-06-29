@@ -5,7 +5,9 @@
 <li class="app-card">
   <a class="app-link app-link-row" href="/app/{{ app.id }}">
     {% if app.icon %}
-    <img class="app-icon-sm" src="{{ app.icon }}" alt="" width="40" height="40">
+    <img class="app-icon-sm" src="{{ app.icon }}" alt="">
+    {% else %}
+    <span class="app-icon-placeholder">{{ app.name[0]|upper }}</span>
     {% endif %}
     <span class="app-link-text">
       <span class="app-name">{{ app.name }}</span>
