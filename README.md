@@ -27,6 +27,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   contattare il client nativo (`spritz://` in un clic) e altrimenti offre il
   repository da aggiungere in HaikuDepot. Template Jinja leggeri, pensati per
   WebPositive.
+- **Pagina di pubblicazione** (`/publish`, autenticata). L'autore compila un
+  form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
+  scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
+  schema dell'ingest, quindi il file generato si re-ingesta sempre pulito.
 
 ## Avvio
 
@@ -85,6 +89,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |
 | POST | `/auth/change-password` · `/auth/logout-all` | account (revoca i token) |
+| GET  | `/publish` | form di pubblicazione (web) |
+| POST | `/publish` | genera cichéto YAML (auth) |
 | POST | `/library/{id}` | accoda install (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |

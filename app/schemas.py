@@ -14,6 +14,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional
 
+import yaml
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -80,3 +81,30 @@ class Cicheto(BaseModel):
 
     class Config:
         use_enum_values = True
+
+
+def cicheto_to_yaml(c: "Cicheto") -> str:
+    """Serialize a validated cichéto to a clean YAML file, ready to drop into a
+    bàcaro. Drops empty/false defaults so the file shows only what was set, and
+    keeps a stable, human-readable key order."""
+    data = c.model_dump(mode="json", exclude_none=True)
+
+    # Strip empty collections and the prerelease=false default for a tidy file.
+    def prune(obj):
+        if isinstance(obj, dict):
+            return {k: prune(v) for k, v in obj.items()
+                    if not (v == [] or v == {} or (k == "prerelease" and v is False))}
+        if isinstance(obj, list):
+            return [prune(v) for v in obj]
+        return obj
+
+    data = prune(data)
+
+    # Preferred top-level order; anything else trails in its existing order.
+    order = ["cicheto", "id", "name", "summary", "homepage", "license",
+             "categories", "icon", "screenshots", "author", "packager",
+             "bridge", "channels"]
+    ordered = {k: data[k] for k in order if k in data}
+    ordered.update({k: v for k, v in data.items() if k not in ordered})
+
+    return yaml.safe_dump(ordered, sort_keys=False, allow_unicode=True)

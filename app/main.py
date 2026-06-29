@@ -37,6 +37,7 @@ from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_git
 from .models import CichetoRow, InstallState, User
+from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
 # Redis in prod for multi-process correctness.
@@ -136,6 +137,26 @@ class TokenOut(BaseModel):
 class QueueBody(BaseModel):
     channel: str = "stable"
     arch: Optional[str] = None
+
+
+class PublishBody(BaseModel):
+    """Flat form fields from the publish page; turned into a cichéto and
+    validated against the real schema before being serialized to YAML."""
+    id: str
+    name: str
+    summary: str
+    bacaro: str
+    homepage: Optional[str] = None
+    license: Optional[str] = None
+    categories: Optional[str] = None        # comma-separated
+    author_name: Optional[str] = None
+    author_contact: Optional[str] = None
+    packager_name: Optional[str] = None
+    haikuports: Optional[str] = None        # bridge target
+    version: Optional[str] = None
+    arch: Optional[str] = None              # e.g. x86_64
+    hpkg_url: Optional[str] = None
+    sha256: Optional[str] = None
 
 
 # ---------- auth ----------
@@ -517,6 +538,70 @@ def app_page(request: Request, cicheto_id: str,
 def get_spritz(request: Request):
     """Placeholder bootstrap page for the native client (built later)."""
     return templates.TemplateResponse(request, "get_spritz.html", {})
+
+
+@app.get("/publish", response_class=HTMLResponse)
+def publish_page(request: Request):
+    """Form for authors to build a cichéto YAML for their own bàcaro.
+
+    The page does not write anything server-side: it produces a downloadable
+    YAML the author commits to their git bàcaro. git stays the source of truth
+    (the git + cache model), so this never becomes a second source of truth.
+    Submission is authenticated so we know who built it, but the artifact is
+    just a file.
+    """
+    return templates.TemplateResponse(request, "publish.html", {})
+
+
+@app.post("/publish", response_class=PlainTextResponse)
+@limiter.limit("20/minute")
+def publish_generate(request: Request, body: "PublishBody",
+                     user: User = Depends(current_user)):
+    """Validate the submitted fields against the cichéto schema and return a
+    clean YAML file. Authenticated (paste your bearer token). Writes nothing:
+    the author drops the returned file into their bàcaro git repo."""
+    # Build a cichéto dict from the flat form, then validate with the real
+    # schema so "if it passes here, it passes ingest".
+    artifacts = {}
+    if body.arch and body.hpkg_url:
+        art: dict = {"url": body.hpkg_url}
+        if body.sha256:
+            art["sha256"] = body.sha256
+        artifacts[body.arch] = art
+
+    data = {
+        "cicheto": 1,
+        "id": body.id,
+        "name": body.name,
+        "summary": body.summary,
+        "homepage": body.homepage or None,
+        "license": body.license or None,
+        "categories": [c.strip() for c in (body.categories or "").split(",") if c.strip()],
+        "author": {"name": body.author_name,
+                   "contact": body.author_contact or None} if body.author_name else None,
+        "packager": {"name": body.packager_name or body.author_name or user.email,
+                     "bacaro": body.bacaro},
+        "bridge": {"haikuports": body.haikuports} if body.haikuports else None,
+        "channels": {
+            "stable": {
+                "version": body.version or None,
+                "kind": "hpkg",
+                "artifacts": artifacts,
+            }
+        },
+    }
+    try:
+        cicheto = Cicheto.model_validate(data)
+    except Exception as e:
+        raise HTTPException(422, f"Cichéto non valido: {e}")
+
+    yaml_text = cicheto_to_yaml(cicheto)
+    filename = f"{cicheto.id}.yaml"
+    return PlainTextResponse(
+        yaml_text,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        media_type="application/x-yaml",
+    )
 
 
 def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:

@@ -11,8 +11,13 @@ Implemented:
 - `GET /app/{id}` full cichéto page: bridge note, channels, author/packager,
   screenshots, and the degrading install button.
 - `GET /get-spritz` bootstrap placeholder for the native client.
-- `/static/spritz.css`, `/static/install-button.js`. The JSON service info moved
-  from `/` to `/api`.
+- `GET /publish` author form + `POST /publish` (authenticated) that validates
+  the fields against the real `Cicheto` schema and returns a clean YAML to drop
+  into the author's bàcaro git. Writes nothing server-side (git stays the source
+  of truth); the generated YAML round-trips through ingest. Auth is paste-the-
+  bearer-token (reuses the existing JWT, no cookies).
+- `/static/spritz.css`, `/static/install-button.js`, `/static/publish.js`. The
+  JSON service info moved from `/` to `/api`. Corporate navy/grey palette.
 Covered by `test_frontend.py` (renders each page, checks the bridge badge/note,
 the channels, the degrading script, and that templates carry no em dashes).
 

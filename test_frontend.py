@@ -61,6 +61,29 @@ assert c.get("/get-spritz").status_code == 200
 assert c.get("/api").json().get("service") == "spritz registry"
 print("static/api         -> ok")
 
+# Publish page + generation flow
+pub = c.get("/publish")
+assert pub.status_code == 200 and 'id="publish-form"' in pub.text
+assert c.get("/static/publish.js").status_code == 200
+form = {"id": "org.test.pub", "name": "Pub", "summary": "test",
+        "bacaro": "tap", "arch": "x86_64",
+        "hpkg_url": "https://e.org/pub-1.0-x86_64.hpkg", "sha256": "a" * 64,
+        "version": "1.0", "haikuports": "pub"}
+assert c.post("/publish", json=form).status_code == 401, "publish must require auth"
+_tok = c.post("/auth/register",
+              json={"email": "pubtest@x.io", "password": "longenough1"}).json()["access_token"]
+gen = c.post("/publish", json=form, headers={"Authorization": f"Bearer {_tok}"})
+assert gen.status_code == 200, gen.text
+assert "org.test.pub.yaml" in gen.headers.get("content-disposition", "")
+# Round-trip: the generated YAML must ingest cleanly.
+import tempfile, yaml as _yaml
+from app.ingest import ingest_directory
+_d = Path(tempfile.mkdtemp())
+(_d / "org.test.pub.yaml").write_text(gen.text)
+rep = ingest_directory(_d, "tap")
+assert rep["ingested"] == ["org.test.pub"] and not rep["failed"], rep
+print("publish round-trip -> ok")
+
 # Italian copy + no em dashes in templates (project rule)
 for tmpl in Path("app/templates").glob("*.html"):
     assert "—" not in tmpl.read_text(), f"em dash found in {tmpl.name}"

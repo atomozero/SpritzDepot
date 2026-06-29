@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Pubblica un'app - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail">
+  <h1>Pubblica la tua app</h1>
+  <p class="lead">
+    spritz non ospita i tuoi binari: punta sempre alla tua release originale.
+    Questa pagina ti aiuta a creare il file <code>cicheto</code> (un piccolo
+    YAML) da mettere nel tuo bacaro git. Da li' spritz lo indicizza.
+  </p>
+
+  <div class="bridge-note">
+    <strong>Come funziona.</strong>
+    Un <em>bacaro</em> e' un repo git con i tuoi file <code>.yaml</code>. Compila
+    il form, scarica il cicheto, mettilo nel tuo bacaro e comunicane l'URL. Se la
+    tua app e' anche su HaikuPorts, indicalo: spritz manda gli utenti alla
+    versione curata. Siamo additivi a HaikuPorts, non un'alternativa.
+  </div>
+
+  <section class="install">
+    <h2>1. Accedi</h2>
+    <p class="hint">
+      Incolla il tuo token di accesso (lo ottieni con <code>/auth/login</code>).
+      Serve solo a sapere chi crea il cicheto: il file resta tuo.
+    </p>
+    <p>
+      <input type="text" id="token" placeholder="token di accesso"
+             style="width:100%;max-width:520px;padding:7px 10px;border:1px solid #cbd5e1;">
+    </p>
+  </section>
+
+  <section class="install">
+    <h2>2. Dati dell'app</h2>
+    <form id="publish-form">
+      <p>
+        <label>ID (reverse-domain, univoco)<br>
+        <input name="id" required placeholder="org.tuonome.tuaapp" class="field"></label>
+      </p>
+      <p>
+        <label>Nome<br>
+        <input name="name" required placeholder="La Mia App" class="field"></label>
+      </p>
+      <p>
+        <label>Descrizione breve<br>
+        <input name="summary" required placeholder="Cosa fa, in una riga" class="field"></label>
+      </p>
+      <p>
+        <label>Bacaro (slug del tuo tap)<br>
+        <input name="bacaro" required placeholder="tuonome-tap" class="field"></label>
+      </p>
+      <p>
+        <label>Homepage (opzionale)<br>
+        <input name="homepage" placeholder="https://github.com/..." class="field"></label>
+      </p>
+      <p>
+        <label>Licenza (opzionale)<br>
+        <input name="license" placeholder="MIT" class="field"></label>
+      </p>
+      <p>
+        <label>Categorie (separate da virgola, opzionale)<br>
+        <input name="categories" placeholder="development, editors" class="field"></label>
+      </p>
+      <p>
+        <label>Autore (nome)<br>
+        <input name="author_name" placeholder="Tuo nome o team" class="field"></label>
+      </p>
+      <p>
+        <label>Contatto autore (opzionale)<br>
+        <input name="author_contact" placeholder="https://github.com/tuonome" class="field"></label>
+      </p>
+      <p>
+        <label>Anche su HaikuPorts? Nome del pacchetto (opzionale ma consigliato)<br>
+        <input name="haikuports" placeholder="nomepacchetto" class="field"></label>
+      </p>
+
+      <h3>Canale stable (release fissata)</h3>
+      <p>
+        <label>Versione<br>
+        <input name="version" placeholder="1.0" class="field"></label>
+      </p>
+      <p>
+        <label>Architettura<br>
+        <input name="arch" placeholder="x86_64" class="field"></label>
+      </p>
+      <p>
+        <label>URL del file .hpkg<br>
+        <input name="hpkg_url" placeholder="https://.../app-1.0-x86_64.hpkg" class="field"></label>
+      </p>
+      <p>
+        <label>sha256 del file (obbligatorio per stable)<br>
+        <input name="sha256" placeholder="checksum a 64 caratteri" class="field"></label>
+      </p>
+
+      <p>
+        <button type="submit" class="btn">Genera il cicheto</button>
+      </p>
+    </form>
+  </section>
+
+  <section class="install" id="result" style="display:none;">
+    <h2>3. Il tuo cicheto</h2>
+    <p class="hint">
+      Salva questo file nel tuo bacaro git (come <code id="result-name">app.yaml</code>),
+      poi comunica l'URL del bacaro.
+    </p>
+    <pre id="result-yaml" style="background:#0f172a;color:#e2e8f0;padding:14px;overflow:auto;border-radius:6px;"></pre>
+    <p><a id="result-download" class="btn" download>Scarica il file</a></p>
+  </section>
+</article>
+
+<script src="/static/publish.js"></script>
+{% endblock %}
