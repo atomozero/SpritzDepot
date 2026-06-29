@@ -219,8 +219,10 @@ def logout_all(user: User = Depends(current_user),
 
 # ---------- public catalog ----------
 
-def _search_rows(session: Session, q: str) -> list[dict]:
-    """Shared search used by both the JSON API and the HTML home."""
+def _search_rows(session: Session, q: str = "", category: str = "",
+                 bacaro: str = "") -> list[dict]:
+    """Shared search used by both the JSON API and the HTML home. Optional
+    exact-match filters by category and bàcaro."""
     stmt = select(CichetoRow)
     if q:
         like = f"%{q}%"
@@ -229,11 +231,20 @@ def _search_rows(session: Session, q: str) -> list[dict]:
             | (CichetoRow.summary.like(like))
             | (CichetoRow.categories.like(like))
         )
+    if category:
+        # categories are comma-joined; match a whole element, not a substring,
+        # by padding both sides with commas (",dev," won't match "development").
+        stmt = stmt.where(
+            ("," + CichetoRow.categories + ",").like(f"%,{category},%")
+        )
+    if bacaro:
+        stmt = stmt.where(CichetoRow.bacaro == bacaro)
     rows = session.exec(stmt.limit(50)).all()
     return [
         {"id": r.id, "name": r.name, "summary": r.summary,
          "bacaro": r.bacaro, "channels": r.channels.split(",") if r.channels else [],
          "haikuports": r.haikuports,
+         "categories": r.categories.split(",") if r.categories else [],
          "icon": (r.raw or {}).get("icon")}
         for r in rows
     ]
@@ -241,8 +252,26 @@ def _search_rows(session: Session, q: str) -> list[dict]:
 
 @app.get("/search")
 def search(q: str = Query("", description="free-text query"),
+           category: str = Query(""), bacaro: str = Query(""),
            session: Session = Depends(get_session)):
-    return _search_rows(session, q)
+    return _search_rows(session, q, category, bacaro)
+
+
+def _category_counts(session: Session) -> list[dict]:
+    """All categories present in the cache, with how many apps each has."""
+    counts: dict[str, int] = {}
+    for r in session.exec(select(CichetoRow)).all():
+        for cat in (r.categories.split(",") if r.categories else []):
+            cat = cat.strip()
+            if cat:
+                counts[cat] = counts.get(cat, 0) + 1
+    return [{"category": c, "count": n}
+            for c, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
+@app.get("/api/categories")
+def api_categories(session: Session = Depends(get_session)):
+    return _category_counts(session)
 
 
 @app.get("/cicheto/{cicheto_id}")
@@ -571,12 +600,22 @@ def repo_package(vendor: str, arch: str, filename: str):
 # ---------- web frontend (server-rendered, WebPositive-friendly) ----------
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, q: str = Query(""),
-         session: Session = Depends(get_session)):
-    """Catalog home + search. Reuses the same query as /search."""
-    results = _search_rows(session, q)
+def home(request: Request, q: str = Query(""), category: str = Query(""),
+         bacaro: str = Query(""), session: Session = Depends(get_session)):
+    """Catalog home + search, optionally filtered by category or bàcaro."""
+    results = _search_rows(session, q, category, bacaro)
     return templates.TemplateResponse(
-        request, "home.html", {"q": q, "results": results}
+        request, "home.html",
+        {"q": q, "category": category, "bacaro": bacaro, "results": results}
+    )
+
+
+@app.get("/categories", response_class=HTMLResponse, include_in_schema=False)
+def categories_page(request: Request, session: Session = Depends(get_session)):
+    """Browse-by-category page."""
+    cats = _category_counts(session)
+    return templates.TemplateResponse(
+        request, "categories.html", {"categories": cats}
     )
 
 

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Categorie - spritz{% endblock %}
+
+{% block content %}
+<section class="results">
+  <h2>Sfoglia per categoria</h2>
+  {% if categories %}
+  <ul class="cat-list">
+    {% for c in categories %}
+    <li>
+      <a class="badge badge-category" href="/?category={{ c.category|urlencode }}">
+        {{ c.category }} <span class="cat-count">{{ c.count }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Nessuna categoria ancora. Il catalogo e' vuoto o le app non
+    ne dichiarano.</p>
+  {% endif %}
+  <p class="hint"><a href="/">torna al catalogo</a></p>
+</section>
+{% endblock %}

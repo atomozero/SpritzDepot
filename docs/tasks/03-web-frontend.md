@@ -47,6 +47,9 @@ A catalog UI over the existing registry API. No new backend logic, it consumes
 Pages:
 - **Home / search**: search box, results list (name, summary, bàcaro, channels,
   a badge if a HaikuPorts bridge exists). Calls `GET /search?q=`.
+  DONE: also filters by category and bàcaro (`?category=`, `?bacaro=`, exact
+  match), category/bàcaro badges are clickable links, and a `/categories` page
+  lists categories with counts (`GET /api/categories`).
 - **App page**: full cichéto. Screenshots, channels (stable / ombra), author and
   packager, the bridge note ("also on HaikuPorts, use the curated version
   there") when present. Calls `GET /cicheto/{id}`.

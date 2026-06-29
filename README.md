@@ -25,11 +25,12 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   HaikuDepot. Il rebuild è automatico all'`/ingest` (oppure `POST /repo/build`
   on demand). Un sub-repo per vendor, perché `package_repo` impone che tutti i
   pacchetti di un repo abbiano lo stesso vendor (vedi `docs/DECISIONS.md`).
-- **Frontend web (server-rendered, in italiano).** Home con ricerca, pagina
-  app con i canali, la nota bridge HaikuPorts e il bottone che degrada: prova a
-  contattare il client nativo (`spritz://` in un clic) e altrimenti offre il
-  repository da aggiungere in HaikuDepot. Template Jinja leggeri, pensati per
-  WebPositive.
+- **Frontend web (server-rendered, in italiano).** Home con ricerca e filtri
+  (categoria, bàcaro), pagina app con i canali, la nota bridge HaikuPorts e il
+  bottone che degrada: prova a contattare il client nativo (`spritz://` in un
+  clic) e altrimenti offre il repository da aggiungere in HaikuDepot. I badge
+  categoria e bàcaro sono cliccabili; c'è una pagina `/categories` per sfogliare.
+  Template Jinja leggeri, pensati per WebPositive.
 - **Pagina di pubblicazione** (`/publish`, autenticata). L'autore compila un
   form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
   scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
@@ -94,7 +95,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 
 | Metodo | Path | Per chi |
 |---|---|---|
-| GET  | `/search?q=` | catalogo web |
+| GET  | `/search?q=&category=&bacaro=` | catalogo web (con filtri) |
+| GET  | `/api/categories` | categorie con conteggi |
 | GET  | `/cicheto/{id}` | pagina-app |
 | GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |

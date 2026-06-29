@@ -129,6 +129,16 @@ a { color: #2563eb; }
 }
 .badge-channel { background: #eff6ff; border-color: #dbeafe; color: #1d4ed8; }
 .badge-bridge { background: #f0fdf4; border-color: #dcfce7; color: #15803d; }
+.badge-category { background: #f5f3ff; border-color: #e9e2ff; color: #6d28d9; text-decoration: none; }
+.badge-category:hover { background: #ede9fe; }
+a.badge-bacaro { text-decoration: none; }
+a.badge-bacaro:hover { background: #e2e8f0; }
+
+/* Categories page. */
+.cat-list { list-style: none; padding: 0; margin: 16px 0; }
+.cat-list li { display: inline-block; margin: 4px 6px 4px 0; }
+.cat-list .badge-category { font-size: 14px; padding: 5px 12px; }
+.cat-count { color: #8b5cf6; font-weight: bold; margin-left: 4px; }
 
 .empty { color: #64748b; font-style: italic; }
 

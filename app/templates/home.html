@@ -13,9 +13,13 @@
     </span>
   </a>
   <div class="app-meta">
-    <span class="badge badge-bacaro">bacaro: {{ app.bacaro }}</span>
+    <a class="badge badge-bacaro" href="/?bacaro={{ app.bacaro|urlencode }}"
+       title="Mostra le app di questo bacaro">bacaro: {{ app.bacaro }}</a>
     {% for ch in app.channels %}
     <span class="badge badge-channel">{{ ch }}</span>
+    {% endfor %}
+    {% for cat in app.categories %}
+    <a class="badge badge-category" href="/?category={{ cat|urlencode }}">{{ cat }}</a>
     {% endfor %}
     {% if app.haikuports %}
     <span class="badge badge-bridge" title="Disponibile anche su HaikuPorts">
@@ -42,13 +46,24 @@
 </section>
 
 <section class="results">
-  <h2>{% if q %}Risultati per "{{ q }}"{% else %}Sfoglia{% endif %}</h2>
+  <h2>
+    {% if q %}Risultati per "{{ q }}"
+    {% elif category %}Categoria: {{ category }}
+    {% elif bacaro %}Bacaro: {{ bacaro }}
+    {% else %}Sfoglia{% endif %}
+  </h2>
+  {% if q or category or bacaro %}
+  <p class="hint"><a href="/">azzera i filtri</a> &middot;
+    <a href="/categories">sfoglia per categoria</a></p>
+  {% else %}
+  <p class="hint"><a href="/categories">sfoglia per categoria</a></p>
+  {% endif %}
   {% if results %}
   <ul class="app-list">
     {% for app in results %}{{ app_card(app) }}{% endfor %}
   </ul>
-  {% elif q %}
-  <p class="empty">Nessun risultato. Prova con un altro termine.</p>
+  {% elif q or category or bacaro %}
+  <p class="empty">Nessun risultato. <a href="/">Azzera i filtri</a> e riprova.</p>
   {% else %}
   <p class="empty">Il catalogo e' ancora vuoto.</p>
   {% endif %}
