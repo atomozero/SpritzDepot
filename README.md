@@ -105,6 +105,8 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/search?q=&category=&bacaro=` | catalogo web (con filtri) |
 | GET  | `/api/categories` | categorie con conteggi |
 | GET  | `/bacari` | bàcari noti (conteggi, ultimo ingest) |
+| GET  | `/health` | liveness/readiness (503 se il DB non risponde) |
+| GET  | `/stats` | conteggi del catalogo (cichéti, bàcari, per categoria/canale) |
 | GET  | `/cicheto/{id}` | pagina-app |
 | GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |

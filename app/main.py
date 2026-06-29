@@ -815,3 +815,51 @@ def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:
 @app.get("/api")
 def api_root():
     return {"service": "spritz registry", "version": "0.1.0", "docs": "/docs"}
+
+
+# ---------- ops: health + stats ----------
+
+@app.get("/health")
+def health(session: Session = Depends(get_session)):
+    """Liveness/readiness. Confirms the DB answers. Returns 503 if it does not,
+    so a load balancer can take the instance out of rotation."""
+    try:
+        session.exec(select(CichetoRow.id).limit(1)).first()
+    except Exception as e:
+        raise HTTPException(503, f"database unavailable: {e}")
+    return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/stats")
+def stats(session: Session = Depends(get_session)):
+    """Catalog counts, for monitoring and to show the catalog growing."""
+    rows = session.exec(select(CichetoRow)).all()
+    by_category: dict[str, int] = {}
+    by_channel: dict[str, int] = {}
+    with_bridge = 0
+    for r in rows:
+        for cat in (r.categories.split(",") if r.categories else []):
+            cat = cat.strip()
+            if cat:
+                by_category[cat] = by_category.get(cat, 0) + 1
+        for ch in (r.channels.split(",") if r.channels else []):
+            ch = ch.strip()
+            if ch:
+                by_channel[ch] = by_channel.get(ch, 0) + 1
+        if r.haikuports:
+            with_bridge += 1
+
+    distinct_bacari = len({r.bacaro for r in rows if r.bacaro})
+    users = len(session.exec(select(User.id)).all())
+    installs = len(session.exec(select(InstallState.id)).all())
+
+    return {
+        "cicheti": len(rows),
+        "bacari": distinct_bacari,
+        "users": users,
+        "library_entries": installs,
+        "with_haikuports_bridge": with_bridge,
+        "by_channel": dict(sorted(by_channel.items())),
+        "by_category": dict(sorted(by_category.items(),
+                                   key=lambda kv: (-kv[1], kv[0]))),
+    }
