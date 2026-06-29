@@ -1,18 +1,18 @@
 """Database engine and session management.
 
-SQLite for the prototype; swap the URL for Postgres in production
+SQLite for the prototype; set SPRITZ_DB_URL to a Postgres URL in production
 without touching the rest of the code (SQLModel handles both).
 """
+import os
+
 from sqlmodel import SQLModel, create_engine, Session
 
-DATABASE_URL = "sqlite:///./spritz.db"
+DATABASE_URL = os.environ.get("SPRITZ_DB_URL", "sqlite:///./spritz.db")
 
-# check_same_thread=False is needed only for SQLite + FastAPI's threadpool.
-engine = create_engine(
-    DATABASE_URL,
-    echo=False,
-    connect_args={"check_same_thread": False},
-)
+# check_same_thread=False is only needed for SQLite + FastAPI's threadpool.
+_connect_args = ({"check_same_thread": False}
+                 if DATABASE_URL.startswith("sqlite") else {})
+engine = create_engine(DATABASE_URL, echo=False, connect_args=_connect_args)
 
 
 def init_db() -> None:

@@ -74,6 +74,7 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
 | `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale per il crawler ombra (alza il rate limit dell'API release). |
 | `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
+| `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | URL del database. In prod puntalo a Postgres (vedi `migrations/`). |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`

@@ -173,12 +173,14 @@ operational record, not a source of truth (the git repo still is). `init_db`
 now imports models before create_all so new tables register regardless of
 import order.
 
-**Schema evolution is create_all-only for now (no migrations).** `create_all`
-adds missing *tables* (so new ones like `bacari` appear), but does NOT add
-*columns* to existing tables. New columns on existing models (e.g. User
-`token_version`) only land on a fresh DB. For SQLite dev this is fine; before a
-long-lived prod DB, add Alembic (or equivalent) migrations. Recorded so it is
-not forgotten at deploy time.
+**Schema: create_all in dev, Alembic for persistent DBs.** `create_all` (run at
+startup) adds missing *tables* but NOT *columns* to existing tables, so it is
+fine for throwaway SQLite dev but not for an evolving prod DB. Alembic is now
+set up (`alembic.ini`, `migrations/`) with an initial migration covering the
+full schema; `SPRITZ_DB_URL` is shared by the app and Alembic (and lets prod
+point at Postgres without code changes). Prod path: `alembic upgrade head` on a
+clean DB, then incremental migrations per model change. Dev keeps using
+create_all for convenience; the two do not conflict (create_all is idempotent).
 
 ## Open (resolve and record here)
 

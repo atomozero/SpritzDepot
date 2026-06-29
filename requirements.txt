@@ -9,3 +9,4 @@ email-validator
 httpx
 slowapi
 jinja2
+alembic
