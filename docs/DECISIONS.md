@@ -155,6 +155,15 @@ re-hosting": it covers authors with nowhere to host an image, while binaries
 strict: image-only by magic bytes (not extension), size-capped (2MB/5MB),
 content-addressed (safe paths, dedup), authenticated, rate-limited.
 
+**Ingest prunes, and attributes by crawl slug not by self-declared packager.**
+The DB is a projection of the bàcari, so a re-ingest removes cichéti that
+vanished from that bàcaro (prune=True default), keeping the cache faithful.
+Crucially, a row is attributed to the slug the crawl was run under, NOT to the
+cichéto's own `packager.bacaro`: otherwise a malicious cichéto could claim
+another tap's slug and get another tap's rows pruned or hijacked. `/bacari`
+lists known taps with counts and last-ingest. `prune=False` is available for
+batch/partial ingests.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

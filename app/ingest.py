@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 import yaml
 from pydantic import ValidationError
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from . import config
 from .db import engine
@@ -90,8 +90,18 @@ def _parse_file(path: Path) -> Cicheto:
     return Cicheto.model_validate(data)
 
 
-def ingest_directory(root: Path, bacaro_slug: str) -> dict:
-    """Walk a directory of cichéti and upsert them. Returns a small report."""
+def ingest_directory(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
+    """Walk a directory of cichéti and upsert them, attributing them to
+    `bacaro_slug`. With prune=True (default) also drop cichéti previously
+    attributed to this bàcaro that did not appear this time, so the cache stays
+    a faithful projection of the bàcaro (the git is the source of truth).
+
+    Returns a small report: ingested, failed, removed.
+
+    Note: rows are attributed to `bacaro_slug` (the crawl's tap), NOT to the
+    cichéto's self-declared packager.bacaro. A cichéto cannot claim another
+    tap's slug and so cannot cause another tap's rows to be pruned or hijacked.
+    """
     ok, failed = [], []
     files = list(root.rglob("*.yaml")) + list(root.rglob("*.yml"))
 
@@ -107,7 +117,7 @@ def ingest_directory(root: Path, bacaro_slug: str) -> dict:
                 id=c.id,
                 name=c.name,
                 summary=c.summary,
-                bacaro=(c.packager.bacaro if c.packager else bacaro_slug),
+                bacaro=bacaro_slug,
                 categories=",".join(c.categories),
                 haikuports=(c.bridge.haikuports if c.bridge else None),
                 channels=",".join(c.channels.keys()),
@@ -115,9 +125,38 @@ def ingest_directory(root: Path, bacaro_slug: str) -> dict:
             )
             session.merge(row)  # upsert by primary key
             ok.append(c.id)
+
+        removed = []
+        if prune:
+            seen = set(ok)
+            stale = session.exec(
+                select(CichetoRow).where(CichetoRow.bacaro == bacaro_slug)
+            ).all()
+            for r in stale:
+                if r.id not in seen:
+                    session.delete(r)
+                    removed.append(r.id)
+
         session.commit()
 
-    return {"bacaro": bacaro_slug, "ingested": ok, "failed": failed}
+    return {"bacaro": bacaro_slug, "ingested": ok,
+            "failed": failed, "removed": removed}
+
+
+def list_bacari() -> list[dict]:
+    """Known bàcari in the cache, with app counts and the most recent ingest
+    time. A small projection over CichetoRow.bacaro."""
+    with Session(engine) as session:
+        rows = session.exec(select(CichetoRow)).all()
+    agg: dict[str, dict] = {}
+    for r in rows:
+        b = r.bacaro or "(unknown)"
+        a = agg.setdefault(b, {"bacaro": b, "count": 0, "last_ingest": None})
+        a["count"] += 1
+        ts = r.ingested_at.isoformat() if r.ingested_at else None
+        if ts and (a["last_ingest"] is None or ts > a["last_ingest"]):
+            a["last_ingest"] = ts
+    return sorted(agg.values(), key=lambda d: d["bacaro"])
 
 
 def ingest_git(git_url: str, bacaro_slug: str) -> dict:

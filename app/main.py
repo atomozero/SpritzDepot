@@ -36,7 +36,7 @@ from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
-from .ingest import ingest_git
+from .ingest import ingest_git, list_bacari
 from .models import CichetoRow, InstallState, User
 from .schemas import Cicheto, cicheto_to_yaml
 
@@ -487,6 +487,12 @@ def ingest(request: Request, body: IngestBody, rebuild: bool = True,
         except repo_proxy.ToolUnavailable:
             result = {**result, "repo": {"skipped": "package_repo not configured"}}
     return result
+
+
+@app.get("/bacari")
+def bacari():
+    """Known bàcari (taps) in the cache, with app counts and last ingest."""
+    return list_bacari()
 
 
 # ---------- repo-proxy (HaikuDepot-compatible layer) ----------

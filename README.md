@@ -7,7 +7,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
 
 - **Ingest misto git + cache.** Un *bàcaro* è un repo git di file YAML (*cichéti*).
   Il server li clona, li valida contro lo schema e li proietta in una cache DB
-  interrogabile. Git = fonte di verità, DB = proiezione ricostruibile.
+  interrogabile. Git = fonte di verità, DB = proiezione ricostruibile. L'ingest
+  fa pruning: i cichéti spariti da un bàcaro vengono rimossi dalla cache, così
+  la proiezione resta fedele. L'attribuzione al bàcaro usa lo slug del crawl,
+  non il packager dichiarato, così un cichéto non può rubare le righe altrui.
 - **Catalogo pubblico.** `/search`, `/cicheto/{id}`.
 - **Account email + password.** `/auth/register`, `/auth/login` (JWT bearer).
 - **Resolve per il demone.** `/resolve/{id}?channel=&arch=` → url + sha256 + requires.
@@ -97,6 +100,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 |---|---|---|
 | GET  | `/search?q=&category=&bacaro=` | catalogo web (con filtri) |
 | GET  | `/api/categories` | categorie con conteggi |
+| GET  | `/bacari` | bàcari noti (conteggi, ultimo ingest) |
 | GET  | `/cicheto/{id}` | pagina-app |
 | GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |
