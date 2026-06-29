@@ -58,11 +58,12 @@ Per-user, bearer auth:
   [{ "cicheto": "org.haiku.genio", "channel": "stable", "arch": "x86_64",
      "kind": "hpkg", "artifacts": {...}, "requires": [...] }]
   ```
-  IMPORTANT: for an `ombra` item this returns the cichéto's *static* artifacts
-  (empty for github-latest), it does NOT resolve live. So for `channel == "ombra"`
-  the daemon must call `/resolve/{id}?channel=ombra&arch=<arch>` to get the real
-  URLs. For `stable` the artifacts here are already usable. (A future registry
-  change could resolve ombra inside pending too; until then, resolve client-side.)
+  ombra (`github-latest`) items are resolved live here too: the registry fills
+  `artifacts` with the latest-release URLs (and `version`) in the same poll, so
+  the daemon needs no extra `/resolve` round trip. If a live resolve fails
+  (GitHub down, rate limit) the item comes back with empty `artifacts` and a
+  `notes` entry, and the daemon should retry on the next poll rather than treat
+  it as installable. `stable` items carry their pinned artifacts directly.
 - `POST /library/{id}/installed` -> mark an item installed once it landed.
 - `POST /library/{id}` (channel, arch in body) -> the web queues installs; the
   daemon does not call this, the browser does.

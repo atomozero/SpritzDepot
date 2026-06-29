@@ -140,7 +140,10 @@ schema and project line say the client verifies the hash at download and logs
 it. The channel may name its repo explicitly (`repo: owner/name`) or have it
 derived from a github.com `homepage`. Only releases that already ship a
 ready-made `.hpkg` are followed; building from source stays out (build-farm,
-later leg). `SPRITZ_GITHUB_TOKEN` raises the API rate limit.
+later leg). `SPRITZ_GITHUB_TOKEN` raises the API rate limit. Both `/resolve` and
+`/library/pending` resolve ombra live, so the daemon gets the real URLs in one
+poll; a live-resolve failure leaves empty artifacts + a note (retry next poll),
+never a hard failure of the whole poll.
 
 ## Open (resolve and record here)
 

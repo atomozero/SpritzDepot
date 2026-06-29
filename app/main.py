@@ -380,12 +380,27 @@ def pending(user: User = Depends(current_user),
         if not row:
             continue
         ch = row.raw.get("channels", {}).get(r.channel, {})
-        out.append({
+        item = {
             "cicheto": r.cicheto_id, "channel": r.channel, "arch": r.arch,
             "kind": ch.get("kind", "hpkg"),
             "artifacts": ch.get("artifacts", {}),
             "requires": ch.get("requires", []),
-        })
+        }
+        # For an ombra (github-latest) item, resolve the live release URLs here
+        # so the daemon gets everything in one poll. Best-effort: a resolve
+        # failure (GitHub down, rate limit) leaves the item with empty artifacts
+        # and a note, rather than failing the whole poll.
+        if ch.get("source") == "github-latest":
+            notes: list = []
+            try:
+                artifacts, version = _resolve_ombra(row.raw, ch, r.arch, notes)
+                item["artifacts"] = artifacts
+                item["version"] = version
+            except HTTPException as e:
+                notes.append(f"ombra resolve failed: {e.detail}")
+            if notes:
+                item["notes"] = notes
+        out.append(item)
     return out
 
 

@@ -137,7 +137,24 @@ try:
     assert art["url"] == "https://x/genio-1.5-x86_64.hpkg", art
     assert "sha256" not in art, "ombra must not carry a pre-computed sha256"
     print("/resolve ombra     -> ok (live url, no sha256)")
+
+    # /library/pending must resolve ombra live too (one poll, no extra call).
+    tok = c.post("/auth/register",
+                 json={"email": "ombra@x.io", "password": "longenough1"}).json()["access_token"]
+    auth = {"Authorization": f"Bearer {tok}"}
+    q = c.post("/library/org.haiku.genio",
+               json={"channel": "ombra", "arch": "x86_64"}, headers=auth)
+    assert q.status_code == 200, q.text
+    pend = c.get("/library/pending", headers=auth)
+    assert pend.status_code == 200, pend.text
+    items = pend.json()
+    assert len(items) == 1, items
+    it = items[0]
+    assert it["channel"] == "ombra" and it["version"] == "v1.5", it
+    assert it["artifacts"]["x86_64"]["url"] == "https://x/genio-1.5-x86_64.hpkg", it
+    assert "sha256" not in it["artifacts"]["x86_64"], "ombra pending: no sha256"
+    print("/library/pending   -> ok (ombra resolved live in the poll)")
 finally:
     ombra.resolve_github_latest = _orig
 
-print("\nPASS: ombra resolver + /resolve integration")
+print("\nPASS: ombra resolver + /resolve + /library/pending integration")
