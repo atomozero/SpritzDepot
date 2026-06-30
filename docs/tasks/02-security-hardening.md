@@ -38,10 +38,16 @@ nice-to-have.
       the email exists. Kept and commented.
 - [x] **CORS.** Locked to `SPRITZ_CORS_ORIGINS` (default localhost dev frontend),
       never `*`.
-- [x] **Proxy SSRF guard.** `repo_proxy._guard_fetch_url`: in prod, https only
-      and reject private/loopback/link-local/reserved resolved addresses; caps
-      the download (500 MB) and always verifies sha256. Relaxed in dev (tests
-      fetch from 127.0.0.1).
+- [x] **SSRF guard on ALL outbound fetches.** Shared `app/netguard.guard_url`:
+      in prod, https only and reject private/loopback/link-local/reserved
+      resolved addresses (blocks cloud metadata at 169.254.169.254, localhost,
+      private ranges). Applied to repo_proxy (artifacts), hvif (icon hpkg), and
+      hpkr (third-party catalog import) so no author/admin URL can make the
+      server fetch internal services. Relaxed in dev (tests use 127.0.0.1).
+- [x] **No script URLs from cichéti.** `homepage`/`icon`/`screenshots` are
+      `HttpUrl` (reject javascript:/data:); `author.contact` (free string shown
+      as a link) is validated to http(s)/mailto only. With Jinja autoescape on,
+      this closes the stored-XSS path a malicious cichéto could open via an href.
 
 ## Verify
 

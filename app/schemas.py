@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Optional
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class Kind(str, Enum):
@@ -27,6 +27,20 @@ class Author(BaseModel):
     """Who writes the software."""
     name: str
     contact: Optional[str] = None
+
+    @field_validator("contact")
+    @classmethod
+    def _safe_contact(cls, v: Optional[str]) -> Optional[str]:
+        """contact is shown as a clickable link, so only allow safe schemes
+        (https/http/mailto). Reject javascript:, data:, etc. to prevent a
+        malicious cichéto from injecting a script URL into an href."""
+        if v is None:
+            return v
+        v = v.strip()
+        low = v.lower()
+        if low.startswith(("https://", "http://", "mailto:")):
+            return v
+        raise ValueError("contact must be an http(s) or mailto: URL")
 
 
 class Packager(BaseModel):

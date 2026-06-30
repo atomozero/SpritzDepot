@@ -216,6 +216,16 @@ back to a generated initial-on-gradient placeholder on 404. Verified end to end
 against a real package (minecraft_installer from the lote repo). zstd needed the
 `zstandard` Python package; hpkg heaps use it, HPKR repo catalogs used zlib.
 
+**Security review findings (fixed).** Two real issues found auditing the
+third-party-content surface: (1) `author.contact` was a free string rendered in
+an `href`, so a cichéto could inject `javascript:` (stored XSS on click); it is
+now validated to http(s)/mailto only, and the other URL fields are already
+`HttpUrl`. (2) Only the repo-proxy guarded outbound fetches against SSRF; icon
+extraction (hvif) and HPKR import (hpkr) fetched author/admin URLs unguarded; the guard
+is now shared in `app/netguard.py` and applied to all three. Jinja autoescape is
+on and no template uses `|safe`. Path traversal on the served file routes is
+blocked. test_security covers both fixes.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

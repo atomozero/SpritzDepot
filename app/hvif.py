@@ -22,7 +22,7 @@ from typing import Optional
 
 import httpx
 
-from . import config
+from . import config, netguard
 from .hpkg_heap import HeapError, decompress_heap
 
 HVIF_MAGIC = b"ncif"
@@ -94,6 +94,11 @@ def icon_png_from_hpkg_url(url: str, size: int = 64,
     """
     if not tool_available():
         raise IconError("hvif2png not configured")
+
+    try:
+        netguard.guard_url(url)
+    except netguard.BlockedURLError as e:
+        raise IconError(str(e)) from e
 
     own = client or httpx.Client(timeout=60.0, follow_redirects=True)
     try:

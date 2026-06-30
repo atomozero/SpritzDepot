@@ -111,6 +111,42 @@ codes = [c.post("/auth/login",
 print("login burst codes   ->", f"{codes.count(401)}x401 {codes.count(429)}x429")
 assert 429 in codes, "rate limit should kick in (expected some 429)"
 
+# --- XSS: author.contact must reject dangerous URL schemes ---
+from app.schemas import Cicheto
+
+
+def _contact_ok(value):
+    try:
+        Cicheto.model_validate({"cicheto": 1, "id": "x.y", "name": "N",
+                                "summary": "s", "author": {"name": "A", "contact": value},
+                                "channels": {"stable": {"kind": "hpkg"}}})
+        return True
+    except Exception:
+        return False
+
+
+assert not _contact_ok("javascript:alert(1)"), "javascript: contact must be rejected"
+assert not _contact_ok("data:text/html,<script>"), "data: contact must be rejected"
+assert _contact_ok("https://github.com/me") and _contact_ok("mailto:me@x.io")
+print("contact XSS guard    -> ok (javascript:/data: rejected)")
+
+# --- SSRF: the shared guard blocks internal hosts in prod ---
+from app import netguard, config as _cfg
+_saved_prod = _cfg.IS_PROD
+_cfg.IS_PROD = True
+try:
+    for bad in ("http://127.0.0.1/x", "https://169.254.169.254/meta",
+                "https://10.0.0.1/r", "http://example.org/x"):  # http blocked too
+        try:
+            netguard.guard_url(bad)
+            raise SystemExit(f"FAIL: SSRF guard accepted {bad}")
+        except netguard.BlockedURLError:
+            pass
+    netguard.guard_url("https://example.org/x")  # public https is fine
+finally:
+    _cfg.IS_PROD = _saved_prod
+print("SSRF guard           -> ok (internal/non-https blocked in prod)")
+
 # Prod gate: missing secrets must raise.
 from app import config
 saved = (config.IS_PROD, config.SECRET_KEY, config.ADMIN_TOKEN)

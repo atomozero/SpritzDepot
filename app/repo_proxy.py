@@ -35,7 +35,7 @@ from typing import Optional
 
 import httpx
 
-from . import config
+from . import config, netguard
 
 
 class RepoProxyError(RuntimeError):
@@ -144,34 +144,11 @@ MAX_ARTIFACT_BYTES = 500 * 1024 * 1024  # 500 MB
 
 
 def _guard_fetch_url(url: str) -> None:
-    """SSRF guard for author URLs. In prod: https only, and reject private /
-    loopback / link-local hosts so a cichéto cannot make spritz fetch internal
-    services. In dev: relaxed (tests fetch from 127.0.0.1)."""
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    scheme = parsed.scheme.lower()
-    host = parsed.hostname
-
-    if not host:
-        raise RepoProxyError(f"refusing to fetch URL with no host: {url}")
-    if not config.IS_PROD:
-        return  # dev/test: allow http + loopback
-
-    if scheme != "https":
-        raise RepoProxyError(f"refusing non-https author URL in prod: {url}")
-    # Resolve and reject any address that is not a global unicast public IP.
+    """SSRF guard for author URLs (shared netguard); maps to RepoProxyError."""
     try:
-        infos = socket.getaddrinfo(host, None)
-    except socket.gaierror as e:
-        raise RepoProxyError(f"cannot resolve host {host}: {e}") from e
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
-            raise RepoProxyError(f"refusing to fetch internal address {ip} ({host})")
+        netguard.guard_url(url)
+    except netguard.BlockedURLError as e:
+        raise RepoProxyError(str(e)) from e
 
 
 def fetch_verified(url: str, sha256: Optional[str], dest: Path) -> Path:

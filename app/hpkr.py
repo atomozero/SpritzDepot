@@ -21,6 +21,7 @@ from typing import Optional
 
 import httpx
 
+from . import netguard
 from .hpkg_heap import HeapError, decompress_heap
 
 HPKR_MAGIC = b"hpkr"
@@ -305,6 +306,10 @@ def resolve_from_repo(repo_url: str, package: str, arch: Optional[str] = None,
     `repo_url` is the base URL that also serves repo.info and the packages/
     directory (HaikuPorts is excluded by policy at the call site, not here)."""
     base = repo_url.rstrip("/")
+    try:
+        netguard.guard_url(f"{base}/repo")
+    except netguard.BlockedURLError as e:
+        raise HpkrError(str(e)) from e
     own = client or httpx.Client(timeout=20.0, follow_redirects=True)
     try:
         r = own.get(f"{base}/repo")
