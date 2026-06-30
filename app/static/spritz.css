@@ -54,6 +54,10 @@ a:hover { text-decoration: underline; }
   color: #c7d2e0; font-size: 14px; margin-left: 14px; padding: 6px 2px;
 }
 .header-link:hover { color: #ffffff; text-decoration: none; }
+.lang-picker { margin-left: 16px; font-size: 12px; color: #7b8aa3; }
+.lang-picker a { color: #9fb0c8; text-decoration: none; }
+.lang-picker a:hover { color: #ffffff; }
+.lang-picker strong { color: #22d3ee; font-weight: bold; }
 
 /* ---------- Buttons ---------- */
 .btn {

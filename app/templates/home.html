@@ -27,8 +27,8 @@
     <a class="badge badge-category" href="/?category={{ cat|urlencode }}">{{ cat }}</a>
     {% endfor %}
     {% if app.haikuports %}
-    <span class="badge badge-bridge" title="Disponibile anche su HaikuPorts">
-      anche su HaikuPorts
+    <span class="badge badge-bridge" title="{{ t('badge.also_on_hp') }}">
+      {{ t('badge.also_on_hp') }}
     </span>
     {% endif %}
   </div>
@@ -37,31 +37,27 @@
 
 {% block content %}
 <section class="hero">
-  <h1>Il catalogo del software per Haiku</h1>
-  <p class="lead">
-    Trova app native, sempre dagli autori originali. spritz raccoglie le fonti
-    che esistono gia' (release su GitHub, repository di terze parti, archivi
-    storici) in un unico indice cercabile.
-  </p>
+  <h1>{{ t('home.hero_title') }}</h1>
+  <p class="lead">{{ t('home.hero_lead') }}</p>
   <form class="search-big" action="/" method="get">
     <input type="text" name="q" value="{{ q|default('') }}"
-           placeholder="Es. Genio, editor, IDE" aria-label="Cerca">
-    <button type="submit">Cerca</button>
+           placeholder="{{ t('home.search_placeholder') }}" aria-label="{{ t('nav.search') }}">
+    <button type="submit">{{ t('nav.search') }}</button>
   </form>
 </section>
 
 <section class="results">
   <h2>
-    {% if q %}Risultati per "{{ q }}"
-    {% elif category %}Categoria: {{ category }}
-    {% elif bacaro %}Bacaro: {{ bacaro }}
-    {% else %}Sfoglia{% endif %}
+    {% if q %}{{ t('home.results_for') }} "{{ q }}"
+    {% elif category %}{{ t('nav.categories') }}: {{ category }}
+    {% elif bacaro %}bacaro: {{ bacaro }}
+    {% else %}{{ t('home.browse') }}{% endif %}
   </h2>
   {% if q or category or bacaro %}
-  <p class="hint"><a href="/">azzera i filtri</a> &middot;
-    <a href="/categories">sfoglia per categoria</a></p>
+  <p class="hint"><a href="/">{{ t('home.clear_filters') }}</a> &middot;
+    <a href="/categories">{{ t('home.browse_by_category') }}</a></p>
   {% else %}
-  <p class="hint"><a href="/categories">sfoglia per categoria</a></p>
+  <p class="hint"><a href="/categories">{{ t('home.browse_by_category') }}</a></p>
   {% endif %}
   {% if results %}
   <ul class="app-list">
@@ -71,18 +67,18 @@
   {% set filt %}{% if q %}&q={{ q|urlencode }}{% endif %}{% if category %}&category={{ category|urlencode }}{% endif %}{% if bacaro %}&bacaro={{ bacaro|urlencode }}{% endif %}{% endset %}
   <nav class="pager">
     {% if page > 1 %}
-    <a class="btn btn-fallback" href="/?page={{ page - 1 }}{{ filt }}">&laquo; Precedente</a>
+    <a class="btn btn-fallback" href="/?page={{ page - 1 }}{{ filt }}">&laquo; {{ t('home.prev') }}</a>
     {% endif %}
-    <span class="pager-info">Pagina {{ page }} di {{ pages }} ({{ total }} app)</span>
+    <span class="pager-info">{{ t('home.page_of', p=page, n=pages) }} ({{ t('home.apps_count', n=total) }})</span>
     {% if page < pages %}
-    <a class="btn btn-fallback" href="/?page={{ page + 1 }}{{ filt }}">Successiva &raquo;</a>
+    <a class="btn btn-fallback" href="/?page={{ page + 1 }}{{ filt }}">{{ t('home.next') }} &raquo;</a>
     {% endif %}
   </nav>
   {% endif %}
   {% elif q or category or bacaro %}
-  <p class="empty">Nessun risultato. <a href="/">Azzera i filtri</a> e riprova.</p>
+  <p class="empty">{{ t('home.no_results') }} <a href="/">{{ t('home.clear_filters') }}</a></p>
   {% else %}
-  <p class="empty">Il catalogo e' ancora vuoto.</p>
+  <p class="empty">{{ t('home.empty_catalog') }}</p>
   {% endif %}
 </section>
 {% endblock %}

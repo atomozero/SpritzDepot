@@ -54,7 +54,7 @@ assert _pg["limit"] == 1 and "total" in _pg and len(_pg["results"]) <= 1, _pg
 catpg = c.get("/categories")
 assert catpg.status_code == 200 and "editors" in catpg.text
 hf = c.get("/?category=editors").text
-assert "Genio" in hf and "Categoria: editors" in hf
+assert "Genio" in hf and "editors" in hf  # filtered-by-category view
 assert "/?category=editors" in c.get("/?q=genio").text, "category badge must be a link"
 print("categories+filters -> ok")
 
@@ -79,6 +79,17 @@ assert c.get("/static/login.js").status_code == 200
 assert "/static/auth.js" in c.get("/").text, "auth.js must load on every page"
 assert 'id="nav-login"' in c.get("/").text, "header must have a login link"
 print("login page         -> ok")
+
+# i18n: language picker + cookie-driven translation
+assert 'class="lang-picker"' in c.get("/").text and "/set-lang/de" in c.get("/").text
+c.cookies.set("lang", "de")
+assert "Der Software-Katalog für Haiku" in c.get("/").text, "German hero missing"
+c.cookies.set("lang", "fr")
+assert "Le catalogue de logiciels pour Haiku" in c.get("/").text
+sl = c.get("/set-lang/es", follow_redirects=False)
+assert sl.status_code == 303 and "lang=es" in sl.headers.get("set-cookie", "")
+c.cookies.delete("lang")
+print("i18n               -> ok")
 
 # Haiku SVG placeholder (used when an app has no extractable icon)
 ph = c.get("/placeholder.svg?name=Blender")

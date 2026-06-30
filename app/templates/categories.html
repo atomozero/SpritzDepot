@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Categorie - spritz{% endblock %}
+{% block title %}{{ t('cat.browse_title') }} - spritz{% endblock %}
 
 {% block content %}
 <section class="results">
-  <h2>Sfoglia per categoria</h2>
+  <h2>{{ t('cat.browse_title') }}</h2>
   {% if categories %}
   <ul class="cat-list">
     {% for c in categories %}
@@ -15,9 +15,8 @@
     {% endfor %}
   </ul>
   {% else %}
-  <p class="empty">Nessuna categoria ancora. Il catalogo e' vuoto o le app non
-    ne dichiarano.</p>
+  <p class="empty">{{ t('cat.empty') }}</p>
   {% endif %}
-  <p class="hint"><a href="/">torna al catalogo</a></p>
+  <p class="hint"><a href="/">{{ t('cat.back') }}</a></p>
 </section>
 {% endblock %}

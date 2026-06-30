@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="{{ lang|default('it') }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}spritz{% endblock %}</title>
-  <meta name="description" content="{% block description %}spritz: il catalogo federato di software per Haiku. Trova app native, sempre dagli autori originali.{% endblock %}">
+  <meta name="description" content="{% block description %}{{ t('home.hero_lead') }}{% endblock %}">
   <link rel="stylesheet" href="/static/spritz.css?v={{ asset_version }}">
   <script src="/static/auth.js"></script>
 </head>
@@ -13,16 +13,19 @@
     <a class="brand" href="/">spritz</a>
     <form class="search-inline" action="/" method="get">
       <input type="text" name="q" value="{{ q|default('') }}"
-             placeholder="Cerca un'app per Haiku" aria-label="Cerca">
-      <button type="submit">Cerca</button>
+             placeholder="{{ t('nav.search_placeholder') }}" aria-label="{{ t('nav.search') }}">
+      <button type="submit">{{ t('nav.search') }}</button>
     </form>
-    <a class="header-link" href="/categories">Categorie</a>
-    <a class="header-link" href="/library-page">Le mie app</a>
-    <a class="header-link" href="/publish">Pubblica</a>
-    <a class="header-link" href="/admin">Admin</a>
+    <a class="header-link" href="/categories">{{ t('nav.categories') }}</a>
+    <a class="header-link" href="/library-page">{{ t('nav.my_apps') }}</a>
+    <a class="header-link" href="/publish">{{ t('nav.publish') }}</a>
+    <a class="header-link" href="/admin">{{ t('nav.admin') }}</a>
     <span class="header-link" id="nav-who" style="display:none;"></span>
-    <a class="header-link" id="nav-login" href="/login">Accedi</a>
-    <a class="header-link" id="nav-logout" href="#" style="display:none;">Esci</a>
+    <a class="header-link" id="nav-login" href="/login">{{ t('nav.login') }}</a>
+    <a class="header-link" id="nav-logout" href="#" style="display:none;">{{ t('nav.logout') }}</a>
+    <span class="lang-picker">
+      {% for code, label in langs.items() %}{% if code == lang %}<strong>{{ label }}</strong>{% else %}<a href="/set-lang/{{ code }}">{{ label }}</a>{% endif %}{% if not loop.last %} {% endif %}{% endfor %}
+    </span>
   </header>
 
   <main class="content">
@@ -30,11 +33,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>
-      spritz e' un catalogo che punta agli autori originali. E' additivo a
-      HaikuPorts, non un'alternativa: quando un'app esiste anche li', spritz te
-      lo dice e ti manda alla versione curata.
-    </p>
+    <p>{{ t('footer.text') }}</p>
   </footer>
 </body>
 </html>

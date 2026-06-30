@@ -1,29 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Accedi - spritz{% endblock %}
+{% block title %}{{ t('login.title') }} - spritz{% endblock %}
 
 {% block content %}
 <article class="app-detail" style="max-width:460px;">
-  <h1>Accedi</h1>
-  <p class="lead">
-    Entra per gestire la tua libreria e pubblicare le tue app. Se non hai un
-    account, registrane uno: basta una email e una password.
-  </p>
+  <h1>{{ t('login.title') }}</h1>
+  <p class="lead">{{ t('login.lead') }}</p>
 
   <section class="install">
     <form id="auth-form">
       <p>
-        <label>Email<br>
+        <label>{{ t('login.email') }}<br>
         <input type="email" name="email" required class="field" autocomplete="username"></label>
       </p>
       <p>
-        <label>Password<br>
+        <label>{{ t('login.password') }}<br>
         <input type="password" name="password" required class="field"
                autocomplete="current-password" minlength="8"></label>
-        <span class="hint">Almeno 8 caratteri.</span>
+        <span class="hint">{{ t('login.min_chars') }}</span>
       </p>
       <p>
-        <button type="submit" class="btn" id="btn-login">Accedi</button>
-        <button type="button" class="btn btn-fallback" id="btn-register">Registrati</button>
+        <button type="submit" class="btn" id="btn-login">{{ t('login.title') }}</button>
+        <button type="button" class="btn btn-fallback" id="btn-register">{{ t('login.register') }}</button>
         <span class="hint" id="auth-status"></span>
       </p>
     </form>

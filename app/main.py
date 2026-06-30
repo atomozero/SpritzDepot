@@ -36,7 +36,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import config, hpkr, hvif, ombra, repo_proxy, uploads
+from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import check_prod_config
@@ -108,6 +108,41 @@ def _asset_version() -> str:
         return "0"
 
 templates.env.globals["asset_version"] = _asset_version()
+
+
+# ---------- i18n ----------
+
+def current_lang(request: Request) -> str:
+    """Pick the UI language: `lang` cookie, else the browser's Accept-Language,
+    else the default. Always a supported code."""
+    cookie = request.cookies.get("lang")
+    if cookie:
+        return i18n.normalize_lang(cookie)
+    accept = request.headers.get("accept-language", "")
+    first = accept.split(",")[0] if accept else ""
+    return i18n.normalize_lang(first)
+
+
+def render(request: Request, template: str, ctx: Optional[dict] = None):
+    """TemplateResponse with i18n helpers (lang, t, langs) always in context."""
+    lang = current_lang(request)
+    base = {
+        "lang": lang,
+        "langs": i18n.LANGS,
+        "t": lambda key, **f: i18n.t(key, lang, **f),
+    }
+    base.update(ctx or {})
+    return templates.TemplateResponse(request, template, base)
+
+
+@app.get("/set-lang/{lang}")
+def set_lang(lang: str, request: Request):
+    """Set the UI language cookie and return to where the user came from."""
+    code = i18n.normalize_lang(lang)
+    back = request.headers.get("referer") or "/"
+    resp = RedirectResponse(back, status_code=303)
+    resp.set_cookie("lang", code, max_age=60 * 60 * 24 * 365, samesite="lax")
+    return resp
 
 
 # ---------- admin guard ----------
@@ -781,7 +816,7 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
     results, total = _search_rows(session, q, category, bacaro,
                                   limit=PAGE_SIZE, offset=offset)
     pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
-    return templates.TemplateResponse(
+    return render(
         request, "home.html",
         {"q": q, "category": category, "bacaro": bacaro, "results": results,
          "total": total, "page": page, "pages": pages}
@@ -792,9 +827,7 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
 def categories_page(request: Request, session: Session = Depends(get_session)):
     """Browse-by-category page."""
     cats = _category_counts(session)
-    return templates.TemplateResponse(
-        request, "categories.html", {"categories": cats}
-    )
+    return render(request, "categories.html", {"categories": cats})
 
 
 @app.get("/app/{cicheto_id}", response_class=HTMLResponse)
@@ -808,15 +841,13 @@ def app_page(request: Request, cicheto_id: str,
     # If a built stable sub-repo exists, hand the page its public URL so the
     # fallback button can point HaikuDepot at it.
     repo_base = _stable_repo_url_for(session, row)
-    return templates.TemplateResponse(
-        request, "app.html", {"app": app_data, "repo_base": repo_base}
-    )
+    return render(request, "app.html", {"app": app_data, "repo_base": repo_base})
 
 
 @app.get("/get-spritz", response_class=HTMLResponse)
 def get_spritz(request: Request):
     """Placeholder bootstrap page for the native client (built later)."""
-    return templates.TemplateResponse(request, "get_spritz.html", {})
+    return render(request, "get_spritz.html", {})
 
 
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
@@ -824,21 +855,21 @@ def admin_page(request: Request):
     """Admin page: paste the admin token, ingest/re-crawl taps, rebuild repos.
     The page is served to anyone but inert without the token; every action is
     verified server-side against SPRITZ_ADMIN_TOKEN."""
-    return templates.TemplateResponse(request, "admin.html", {})
+    return render(request, "admin.html", {})
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     """Browser login/registration. The form calls /auth/login or
     /auth/register and stores the JWT client-side (see static/auth.js)."""
-    return templates.TemplateResponse(request, "login.html", {})
+    return render(request, "login.html", {})
 
 
 @app.get("/library-page", response_class=HTMLResponse)
 def library_page(request: Request):
     """'My apps' page: the user pastes their token; JS fetches /library and
     renders the list. Reuses the existing JWT auth (no cookies)."""
-    return templates.TemplateResponse(request, "library.html", {})
+    return render(request, "library.html", {})
 
 
 @app.get("/publish", response_class=HTMLResponse)
@@ -851,7 +882,7 @@ def publish_page(request: Request):
     Submission is authenticated so we know who built it, but the artifact is
     just a file.
     """
-    return templates.TemplateResponse(request, "publish.html", {})
+    return render(request, "publish.html", {})
 
 
 @app.post("/publish", response_class=PlainTextResponse)
