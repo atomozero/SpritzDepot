@@ -35,6 +35,28 @@
   </section>
 
   <section class="install">
+    <h2>Importa un repository HPKR</h2>
+    <p class="hint">
+      Indicizza un repository Haiku di terze parti (NON HaikuPorts: BeSly, il
+      server di un autore...). spritz legge il catalogo e crea una scheda per
+      ogni pacchetto, che si risolve al volo al momento dell'installazione.
+    </p>
+    <p>
+      <label>URL base del repository<br>
+      <input id="imp-url" class="field" placeholder="https://haikuware.ru/repo/lote"></label>
+    </p>
+    <p>
+      <label>Slug del bacaro<br>
+      <input id="imp-slug" class="field" placeholder="lote"></label>
+    </p>
+    <p>
+      <button id="imp-btn" class="btn">Importa repository</button>
+      <span class="hint" id="imp-status"></span>
+    </p>
+    <pre id="imp-result" style="display:none;background:#0f172a;color:#e2e8f0;padding:12px;overflow:auto;border-radius:6px;"></pre>
+  </section>
+
+  <section class="install">
     <h2>Bacari noti</h2>
     <p>
       <button id="refresh-btn" class="btn btn-fallback">Aggiorna elenco</button>

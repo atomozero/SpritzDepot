@@ -29,6 +29,13 @@
       } else {
         alert("Errore (" + xhr.status + "): " + (xhr.responseText || ""));
       }
+      // Clear any "in progress" status lines on a non-2xx outcome.
+      if (xhr.status < 200 || xhr.status >= 300) {
+        var s1 = document.getElementById("imp-status");
+        var s2 = document.getElementById("ing-status");
+        if (s1) s1.textContent = "";
+        if (s2) s2.textContent = "";
+      }
     };
     xhr.send(opts.body || null);
   }
@@ -52,6 +59,24 @@
            document.getElementById("ing-slug").value.trim(),
            document.getElementById("ing-status"),
            document.getElementById("ing-result"));
+  };
+
+  document.getElementById("imp-btn").onclick = function () {
+    if (!need()) return;
+    var url = document.getElementById("imp-url").value.trim();
+    var slug = document.getElementById("imp-slug").value.trim();
+    if (!url || !slug) { alert("URL e slug sono obbligatori."); return; }
+    var statusEl = document.getElementById("imp-status");
+    var resultEl = document.getElementById("imp-result");
+    statusEl.textContent = "Import in corso (puo' richiedere qualche secondo)...";
+    req("POST", "/repo/import-hpkr", function (data) {
+      var n = data.ingested ? data.ingested.length : 0;
+      var found = data.found_in_catalog != null ? data.found_in_catalog : n;
+      statusEl.textContent = "Importati " + n + " di " + found + " pacchetti.";
+      resultEl.style.display = "block";
+      resultEl.textContent = JSON.stringify(data, null, 2);
+      loadBacari();
+    }, { json: true, body: JSON.stringify({ repo_url: url, bacaro: slug }) });
   };
 
   document.getElementById("rebuild-btn").onclick = function () {
