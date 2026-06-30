@@ -23,9 +23,12 @@
     <span class="header-link" id="nav-who" style="display:none;"></span>
     <a class="header-link" id="nav-login" href="/login">{{ t('nav.login') }}</a>
     <a class="header-link" id="nav-logout" href="#" style="display:none;">{{ t('nav.logout') }}</a>
-    <span class="lang-picker">
-      {% for code, label in langs.items() %}{% if code == lang %}<strong>{{ label }}</strong>{% else %}<a href="/set-lang/{{ code }}">{{ label }}</a>{% endif %}{% if not loop.last %} {% endif %}{% endfor %}
-    </span>
+    <select class="lang-picker" aria-label="{{ t('lang.label') }}"
+            onchange="if(this.value)window.location.href='/set-lang/'+this.value;">
+      {% for code, label in langs.items() %}
+      <option value="{{ code }}"{% if code == lang %} selected{% endif %}>{{ flags[code] }} {{ label }}</option>
+      {% endfor %}
+    </select>
   </header>
 
   <main class="content">

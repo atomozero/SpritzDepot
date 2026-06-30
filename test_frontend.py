@@ -81,7 +81,9 @@ assert 'id="nav-login"' in c.get("/").text, "header must have a login link"
 print("login page         -> ok")
 
 # i18n: language picker + cookie-driven translation
-assert 'class="lang-picker"' in c.get("/").text and "/set-lang/de" in c.get("/").text
+_home = c.get("/").text
+assert '<select class="lang-picker"' in _home, "language <select> missing"
+assert '<option value="de"' in _home and '<option value="ja"' in _home
 c.cookies.set("lang", "de")
 assert "Der Software-Katalog für Haiku" in c.get("/").text, "German hero missing"
 c.cookies.set("lang", "fr")

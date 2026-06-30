@@ -129,6 +129,7 @@ def render(request: Request, template: str, ctx: Optional[dict] = None):
     base = {
         "lang": lang,
         "langs": i18n.LANGS,
+        "flags": i18n.FLAGS,
         "t": lambda key, **f: i18n.t(key, lang, **f),
     }
     base.update(ctx or {})

@@ -54,10 +54,15 @@ a:hover { text-decoration: underline; }
   color: #c7d2e0; font-size: 14px; margin-left: 14px; padding: 6px 2px;
 }
 .header-link:hover { color: #ffffff; text-decoration: none; }
-.lang-picker { margin-left: 16px; font-size: 12px; color: #7b8aa3; }
-.lang-picker a { color: #9fb0c8; text-decoration: none; }
-.lang-picker a:hover { color: #ffffff; }
-.lang-picker strong { color: #22d3ee; font-weight: bold; }
+.lang-picker {
+  margin-left: 16px; font-size: 13px;
+  padding: 6px 8px; border-radius: 6px;
+  background: #0e1a2e; color: #e8eef6; border: 1px solid #2b3a55;
+  cursor: pointer;
+}
+.lang-picker:hover { border-color: #22d3ee; }
+/* options render with the OS widget; keep them readable on dark hosts */
+.lang-picker option { background: #ffffff; color: #1f2933; }
 
 /* ---------- Buttons ---------- */
 .btn {

@@ -20,6 +20,15 @@ LANGS = {
     "ja": "日本語",
     "vec": "Vèneto",
 }
+
+# Flag emoji per language, for the picker. If WebPositive lacks the emoji font,
+# the language name shown next to it keeps the picker usable. Venetian is a
+# region, not a nation: a lion emoji evokes the Lion of St Mark.
+FLAGS = {
+    "it": "🇮🇹", "es": "🇪🇸", "de": "🇩🇪", "zh": "🇨🇳",
+    "nl": "🇳🇱", "fr": "🇫🇷", "ja": "🇯🇵", "vec": "🦁",
+}
+
 DEFAULT_LANG = "it"
 
 # Note on "vec" (Venetian): it has no single codified spelling and many local
