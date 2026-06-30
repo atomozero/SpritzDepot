@@ -10,7 +10,13 @@ body {
   color: #1f2933;
   background: #eef2f7;
   line-height: 1.55;
+  /* sticky footer: page fills the viewport, footer sits at the bottom even on
+     short pages (like the 404), so the content does not look stranded. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
+.content { flex: 1 0 auto; }
 
 a { color: #2563eb; text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -214,5 +220,7 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .admin-table td .btn { padding: 4px 10px; font-size: 13px; margin: 0; }
 
 /* ---------- Footer ---------- */
-.site-footer { max-width: 1180px; margin: 28px auto; padding: 18px 20px;
-  color: #64748b; font-size: 14px; border-top: 1px solid #d8e0ea; }
+.site-footer { max-width: 1180px; width: 100%; margin: 28px auto 0; padding: 18px 20px;
+  color: #64748b; font-size: 14px; border-top: 1px solid #d8e0ea;
+  text-align: center; box-sizing: border-box; flex-shrink: 0; }
+.site-footer p { max-width: 760px; margin: 0 auto; }
