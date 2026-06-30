@@ -26,7 +26,7 @@ from fastapi import (Depends, FastAPI, File, Header, HTTPException, Query,
                      Request, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
-                               RedirectResponse)
+                               RedirectResponse, Response)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field as PField
@@ -976,6 +976,17 @@ def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_bytes(png)
     return FileResponse(cache, media_type="image/png")
+
+
+@app.get("/placeholder.svg")
+def placeholder(name: str = Query("?")):
+    """A Haiku-flavoured SVG placeholder (stylised leaf + the app's initial),
+    used by the frontend when an app has no extractable icon. The tint is
+    derived from `name`. Cacheable and dependency-free."""
+    from . import placeholder as ph
+    svg = ph.placeholder_svg(name, size=64)
+    return Response(svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:

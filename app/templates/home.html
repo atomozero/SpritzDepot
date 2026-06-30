@@ -7,10 +7,10 @@
     {% if app.icon %}
     <img class="app-icon-sm" src="{{ app.icon }}" alt="">
     {% else %}
-    {# Try the extracted hpkg icon; on failure (404) swap to the placeholder. #}
+    {# Try the extracted hpkg icon; on 404 fall back to the Haiku SVG placeholder
+       (onerror cleared so it can't loop). #}
     <img class="app-icon-sm" src="/icon/{{ app.id }}" alt=""
-         onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
-    <span class="app-icon-placeholder" style="display:none;">{{ app.name[0]|upper }}</span>
+         onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
     {% endif %}
     <span class="app-link-text">
       <span class="app-name">{{ app.name }}</span>

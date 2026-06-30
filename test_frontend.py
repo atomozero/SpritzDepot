@@ -80,6 +80,14 @@ assert "/static/auth.js" in c.get("/").text, "auth.js must load on every page"
 assert 'id="nav-login"' in c.get("/").text, "header must have a login link"
 print("login page         -> ok")
 
+# Haiku SVG placeholder (used when an app has no extractable icon)
+ph = c.get("/placeholder.svg?name=Blender")
+assert ph.status_code == 200 and ph.headers["content-type"].startswith("image/svg")
+assert ph.text.lstrip().startswith("<svg") and ">B<" in ph.text
+# the home card falls back to it
+assert "/placeholder.svg?name=" in c.get("/?q=genio").text
+print("svg placeholder    -> ok")
+
 # Static + bootstrap + api
 assert c.get("/static/spritz.css").status_code == 200
 js = c.get("/static/install-button.js")

@@ -7,6 +7,9 @@
   <header class="app-detail-head">
     {% if app.icon %}
     <img class="app-icon" src="{{ app.icon }}" alt="" width="64" height="64">
+    {% else %}
+    <img class="app-icon" width="64" height="64" alt="" src="/icon/{{ app.id }}"
+         onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
     {% endif %}
     <div>
       <h1>{{ app.name }}</h1>
