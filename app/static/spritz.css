@@ -75,7 +75,7 @@ a:hover { text-decoration: underline; }
 .btn-danger { background: #dc2626; }
 .btn-danger:hover { background: #b91c1c; }
 
-.content { max-width: 1000px; margin: 0 auto; padding: 0 20px 32px; }
+.content { max-width: 1180px; margin: 0 auto; padding: 0 20px 32px; }
 
 /* ---------- Hero: dark band ---------- */
 .hero {
@@ -117,7 +117,7 @@ a:hover { text-decoration: underline; }
 }
 .app-card {
   display: inline-block; vertical-align: top;
-  width: 30%; min-width: 240px; margin: 0 1.4% 20px;
+  width: 22%; min-width: 180px; margin: 0 1.5% 20px;
   background: #ffffff; border: 1px solid #e4e9f1; border-radius: 12px;
   padding: 18px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
 }
@@ -203,5 +203,5 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .admin-table td .btn { padding: 4px 10px; font-size: 13px; margin: 0; }
 
 /* ---------- Footer ---------- */
-.site-footer { max-width: 1000px; margin: 28px auto; padding: 18px 20px;
+.site-footer { max-width: 1180px; margin: 28px auto; padding: 18px 20px;
   color: #64748b; font-size: 14px; border-top: 1px solid #d8e0ea; }
