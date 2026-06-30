@@ -117,10 +117,11 @@ Returns the items to install:
    "kind": "hpkg", "artifacts": {...}, "requires": [...], "version": "...",
    "notes": [...] }]
 ```
-ombra items are already resolved live here (artifacts filled with the latest
-URLs), so you do not need an extra /resolve call for them. If an item comes back
-with empty `artifacts` and a `notes` entry, the live resolve failed upstream:
-skip it and retry on the next poll, do not treat it as installable.
+Live-sourced items (ombra and hpkr-repo) are already resolved here, with
+`artifacts` filled with real download URLs, so you never need an extra /resolve
+call from the pending list. If an item comes back with empty `artifacts` and a
+`notes` entry, the live resolve failed upstream: skip it and retry on the next
+poll, do not treat it as installable.
 ```
 POST /library/{id}/installed     (bearer)  -> mark it installed once it landed
 ```

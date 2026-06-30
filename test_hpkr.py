@@ -106,6 +106,19 @@ try:
     assert res["artifacts"]["x86_64"]["url"].endswith(
         "/packages/helloapp-1.2.3-4-x86_64.hpkg"), res
     print("import-hpkr        -> ok (2 imported, resolves live)")
+
+    # /library/pending resolves hpkr-repo live too (not just ombra), so the
+    # daemon gets the real download URL in one poll.
+    ut = c.post("/auth/register",
+                json={"email": "hpkruser@x.io", "password": "longenough1"}).json()["access_token"]
+    uauth = {"Authorization": f"Bearer {ut}"}
+    c.post("/library/repo.tap.helloapp", json={"channel": "stable", "arch": "x86_64"},
+           headers=uauth)
+    pend = c.get("/library/pending", headers=uauth).json()
+    assert len(pend) == 1, pend
+    art = pend[0]["artifacts"].get("x86_64", {})
+    assert art.get("url", "").endswith("/packages/helloapp-1.2.3-4-x86_64.hpkg"), pend
+    print("pending hpkr-repo  -> ok (resolved live in the poll)")
 finally:
     main.httpx.Client = _orig_client
 

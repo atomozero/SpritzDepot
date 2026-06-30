@@ -584,20 +584,30 @@ def pending(user: User = Depends(current_user),
             "artifacts": ch.get("artifacts", {}),
             "requires": ch.get("requires", []),
         }
-        # For an ombra (github-latest) item, resolve the live release URLs here
-        # so the daemon gets everything in one poll. Best-effort: a resolve
-        # failure (GitHub down, rate limit) leaves the item with empty artifacts
-        # and a note, rather than failing the whole poll.
-        if ch.get("source") == "github-latest":
-            notes: list = []
+        # Resolve live-sourced channels here so the daemon gets real download
+        # URLs in one poll (no extra /resolve round trip). Best-effort: a resolve
+        # failure leaves empty artifacts + a note, rather than failing the poll;
+        # the daemon should skip such items and retry next time.
+        source = ch.get("source")
+        notes: list = []
+        if source == "github-latest":
             try:
                 artifacts, version = _resolve_ombra(row.raw, ch, r.arch, notes)
                 item["artifacts"] = artifacts
                 item["version"] = version
             except HTTPException as e:
                 notes.append(f"ombra resolve failed: {e.detail}")
-            if notes:
-                item["notes"] = notes
+        elif source == "hpkr-repo":
+            repo_url = ch.get("repo_url")
+            package = ch.get("package") or row.name
+            try:
+                if not repo_url:
+                    raise hpkr.HpkrError("hpkr-repo channel has no repo_url")
+                item["artifacts"] = hpkr.resolve_from_repo(repo_url, package, r.arch)
+            except hpkr.HpkrError as e:
+                notes.append(f"hpkr-repo resolve failed: {e}")
+        if notes:
+            item["notes"] = notes
         out.append(item)
     return out
 
