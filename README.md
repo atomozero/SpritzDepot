@@ -54,7 +54,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   parti (NON HaikuPorts: BeSly, Fat Elk, il server dell'autore), spritz legge il
   catalogo HPKR (`hpkr.py`, parser in puro Python verificato contro l'output di
   `package_repo`), trova il pacchetto e ne compone l'URL `baseUrl + nome-versione-arch.hpkg`.
-  E' il gap che HaikuDepot non copre di default.
+  E' il gap che HaikuDepot non copre di default. `POST /repo/import-hpkr`
+  (admin) importa in un colpo tutto un repo di terze parti: legge il catalogo e
+  crea un cichéto hpkr-repo per ogni pacchetto (rifiuta gli URL HaikuPorts, che
+  vanno in bridge).
 
 ## Avvio
 
@@ -136,6 +139,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | POST | `/repo/build` | rebuild completo dei sub-repo HaikuDepot (admin) |
 | GET  | `/admin` | pagina admin (web) |
 | GET  | `/admin/bacari` | bàcari memorizzati con URL ed esito (admin) |
+| POST | `/repo/import-hpkr` | importa un repo Haiku di terze parti (admin) |
 | GET  | `/repo/{vendor}/{arch}/current/repo.info` | HaikuDepot |
 | GET  | `/repo/{vendor}/{arch}/current/repo` | HaikuDepot (catalogo HPKR) |
 | GET  | `/repo/{vendor}/{arch}/current/packages/{file}` | HaikuDepot (hpkg) |

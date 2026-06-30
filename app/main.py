@@ -17,6 +17,8 @@ import secrets
 from pathlib import Path
 from typing import Optional
 
+import httpx
+
 from fastapi import (Depends, FastAPI, File, Header, HTTPException, Query,
                      Request, UploadFile, status)
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +38,7 @@ from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
 from .db import get_session, init_db
-from .ingest import ingest_git, list_bacari
+from .ingest import ingest_directory, ingest_git, list_bacari
 from .models import Bacaro, CichetoRow, InstallState, User
 from .schemas import Cicheto, cicheto_to_yaml
 
@@ -561,6 +563,67 @@ def admin_bacari(session: Session = Depends(get_session)):
 def bacari():
     """Known bàcari (taps) in the cache, with app counts and last ingest."""
     return list_bacari()
+
+
+class ImportHpkrBody(BaseModel):
+    repo_url: str          # base URL of a third-party Haiku repo (NOT HaikuPorts)
+    bacaro: str            # slug to attribute the imported cichéti to
+
+
+@app.post("/repo/import-hpkr", dependencies=[Depends(require_admin)])
+@limiter.limit("5/minute")
+def import_hpkr(request: Request, body: ImportHpkrBody,
+                session: Session = Depends(get_session)):
+    """Admin: read a third-party Haiku repository's HPKR catalog and create an
+    hpkr-repo cichéto for every package it lists, ingesting them under `bacaro`.
+
+    Each cichéto resolves live against the repo at install time (no spritz-hosted
+    artifact, no sha256: the client verifies). Reuses ingest_directory so the
+    usual validation + pruning apply (re-importing drops packages that left the
+    repo). Refuses HaikuPorts URLs: those belong in a bridge, not re-served."""
+    import tempfile
+    import yaml as _yaml
+
+    base = body.repo_url.rstrip("/")
+    if "haikuports" in base.lower():
+        raise HTTPException(
+            400, "refusing to import a HaikuPorts repo; use a bridge cichéto instead")
+
+    try:
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            r = client.get(f"{base}/repo")
+            r.raise_for_status()
+            packages = hpkr.parse_catalog(r.content)
+    except (httpx.HTTPError, hpkr.HpkrError) as e:
+        raise HTTPException(502, f"cannot read HPKR catalog at {base}/repo: {e}")
+
+    if not packages:
+        raise HTTPException(404, f"no packages in catalog at {base}/repo")
+
+    # Build one cichéto YAML per package into a temp dir, then ingest it.
+    tmp = Path(tempfile.mkdtemp(prefix="hpkr-import-"))
+    written = 0
+    for p in packages:
+        cid = f"repo.{_slug(body.bacaro)}.{_slug(p.name)}"
+        data = {
+            "cicheto": 1, "id": cid, "name": p.name,
+            "summary": f"{p.name} from the {body.bacaro} repository",
+            "packager": {"name": body.bacaro, "bacaro": body.bacaro},
+            "channels": {"stable": {
+                "version": p.version, "kind": "hpkg",
+                "source": "hpkr-repo", "repo_url": base, "package": p.name,
+            }},
+        }
+        try:
+            Cicheto.model_validate(data)   # guard: only write valid cichéti
+        except Exception:
+            continue
+        (tmp / f"{cid}.yaml").write_text(_yaml.safe_dump(data, sort_keys=False))
+        written += 1
+
+    result = ingest_directory(tmp, body.bacaro)
+    result["found_in_catalog"] = len(packages)
+    return result
 
 
 # ---------- repo-proxy (HaikuDepot-compatible layer) ----------
