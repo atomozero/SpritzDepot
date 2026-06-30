@@ -50,6 +50,11 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   risolve l'ultima release GitHub dell'autore al volo: trova gli asset .hpkg per
   arch col pattern del cichéto e ne restituisce gli URL. Non costruisce
   pacchetti e non pre-calcola l'hash (lo verifica il client al download).
+- **Canale hpkr-repo (repo di terze parti).** Per un repository Haiku di terze
+  parti (NON HaikuPorts: BeSly, Fat Elk, il server dell'autore), spritz legge il
+  catalogo HPKR (`hpkr.py`, parser in puro Python verificato contro l'output di
+  `package_repo`), trova il pacchetto e ne compone l'URL `baseUrl + nome-versione-arch.hpkg`.
+  E' il gap che HaikuDepot non copre di default.
 
 ## Avvio
 
@@ -96,6 +101,7 @@ app/
   auth.py        bcrypt + JWT
   ingest.py      crawl bàcaro (git o cartella) → cache
   ombra.py       resolver canale ombra (ultima release GitHub dell'autore)
+  hpkr.py        lettore catalogo HPKR (risolve hpkg da repo Haiku di terze parti)
   repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
   main.py        route FastAPI (API + frontend)
   templates/     pagine Jinja (home, app, get-spritz)

@@ -31,7 +31,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import config, ombra, repo_proxy, uploads
+from . import config, hpkr, ombra, repo_proxy, uploads
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
@@ -327,6 +327,16 @@ def resolve(cicheto_id: str,
     source = ch.get("source")
     if source == "github-latest":
         artifacts, version = _resolve_ombra(row.raw, ch, arch, notes)
+    elif source == "hpkr-repo":
+        # Resolve against a third-party Haiku repository's HPKR catalog.
+        repo_url = ch.get("repo_url")
+        package = ch.get("package") or row.name
+        if not repo_url:
+            raise HTTPException(422, "hpkr-repo channel needs 'repo_url'")
+        try:
+            artifacts = hpkr.resolve_from_repo(repo_url, package, arch)
+        except hpkr.HpkrError as e:
+            raise HTTPException(502, f"hpkr-repo resolve failed: {e}")
     elif source == "haikuports":
         # Bridge-only: spritz hosts no artifact; the app is curated in
         # HaikuPorts. Tell the client to install it from there.

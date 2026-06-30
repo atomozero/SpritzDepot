@@ -191,6 +191,19 @@ the repo/get-spritz buttons. This makes the additive-to-HaikuPorts principle
 concrete: spritz says "this exists, get the curated version there". The
 sample-bàcaro ships 3DMov as the worked example.
 
+**HPKR catalog reader for third-party repos, not HaikuPorts.** `app/hpkr.py` is
+a pure-Python reader for a repository's `repo` (HPKR) catalog: it lists packages
+and composes their download URL as `baseUrl + name-version-arch.hpkg`. Used by
+the `hpkr-repo` channel so a cichéto can point at a third-party Haiku repository
+(BeSly, an author's own server) that HaikuDepot does not show by default.
+Deliberately NOT used for HaikuPorts apps (those use the bridge, no re-serving).
+The parser was verified against a real HPKR built by Haiku's `package_repo`
+(fixture tests/fixtures/sample.hpkr); getting it right meant matching three
+binary details from the Haiku source: attribute integers are big-endian, the
+string table ends with a 0-byte terminator, and the attribute type enum is
+INT=1/UINT=2/STRING=3/RAW=4 (not 0-based). Heap zlib + uncompressed supported;
+zstd raises rather than guessing. No sha256 (client verifies, like ombra).
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure

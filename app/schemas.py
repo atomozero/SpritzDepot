@@ -56,10 +56,13 @@ class Channel(BaseModel):
     # advisory pre-flight hints; real requires live inside the hpkg.
     requires: list[str] = Field(default_factory=list)
     # for auto-following channels:
-    source: Optional[str] = None    # e.g. "github-latest"
-    repo: Optional[str] = None       # "owner/name" for github-latest; else derived from homepage
+    source: Optional[str] = None    # "github-latest" | "hpkr-repo" | "haikuports"
+    repo: Optional[str] = None       # github "owner/name" (derived from homepage if absent)
     match: Optional[str] = None      # asset pattern, e.g. "genio-*-{arch}.hpkg"
     prerelease: bool = False
+    # for source: hpkr-repo (a third-party Haiku repository, NOT HaikuPorts):
+    repo_url: Optional[str] = None   # base URL serving repo.info, repo, packages/
+    package: Optional[str] = None    # package name as it appears in that catalog
 
 
 class Cicheto(BaseModel):
