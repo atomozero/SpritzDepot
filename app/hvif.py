@@ -13,16 +13,17 @@ found, the caller falls back to the generated placeholder.
 """
 from __future__ import annotations
 
+import os
 import struct
 import subprocess
 import tempfile
-import zlib
 from pathlib import Path
 from typing import Optional
 
 import httpx
 
 from . import config
+from .hpkg_heap import HeapError, decompress_heap
 
 HVIF_MAGIC = b"ncif"
 
@@ -36,25 +37,6 @@ def tool_available() -> bool:
     return bool(b) and Path(b).is_file()
 
 
-def _decompress_heap(comp: int, raw: bytes, uncompressed_size: int) -> bytes:
-    if comp == 0:
-        return raw[:uncompressed_size]
-    if comp == 1:
-        return zlib.decompress(raw)
-    if comp == 2:
-        try:
-            import zstandard
-        except ImportError as e:
-            raise IconError("zstandard not installed for zstd heap") from e
-        dctx = zstandard.ZstdDecompressor()
-        try:
-            return dctx.decompress(raw, max_output_size=uncompressed_size)
-        except zstandard.ZstdError:
-            import io
-            return dctx.stream_reader(io.BytesIO(raw)).read()
-    raise IconError(f"unsupported heap compression {comp}")
-
-
 def _extract_hvif(hpkg: bytes) -> bytes:
     """Find the HVIF icon blob in an hpkg's decompressed heap."""
     if hpkg[:4] != b"hpkg":
@@ -65,7 +47,10 @@ def _extract_hvif(hpkg: bytes) -> bytes:
     (_magic, header_size, _ver, _total, _minor, heap_comp, _chunk,
      heap_comp_size, heap_uncomp_size) = struct.unpack_from(">4sHHQHHIQQ", hpkg, 0)
     heap_raw = hpkg[header_size:header_size + heap_comp_size]
-    heap = _decompress_heap(heap_comp, heap_raw, heap_uncomp_size)
+    try:
+        heap = decompress_heap(heap_comp, heap_raw, heap_uncomp_size)
+    except HeapError as e:
+        raise IconError(str(e)) from e
 
     idx = heap.find(HVIF_MAGIC)
     if idx < 0:
@@ -80,7 +65,7 @@ def _render_png(hvif: bytes, size: int = 64) -> bytes:
     tool = config.HVIF2PNG_BIN
     if not tool or not Path(tool).is_file():
         raise IconError("hvif2png not configured")
-    env = dict(__import__("os").environ)
+    env = dict(os.environ)
     t = Path(tool).resolve()
     for parent in t.parents:
         lib = parent / "lib"

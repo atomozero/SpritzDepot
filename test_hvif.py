@@ -14,6 +14,20 @@ os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
 from pathlib import Path
 from app import hvif
+from app.hpkg_heap import decompress_heap, HeapError
+
+# Shared heap decompression: none / zlib / zstd / unsupported.
+import zlib as _zlib
+assert decompress_heap(0, b"hello world", 5) == b"hello"
+assert decompress_heap(1, _zlib.compress(b"abc" * 10), 30) == b"abc" * 10
+import zstandard as _zstd
+assert decompress_heap(2, _zstd.ZstdCompressor().compress(b"xyz" * 10), 30) == b"xyz" * 10
+try:
+    decompress_heap(9, b"", 0)
+    raise SystemExit("FAIL: unsupported compression accepted")
+except HeapError:
+    pass
+print("heap decompress    -> ok (none/zlib/zstd/unsupported)")
 
 FIXTURE = (Path(__file__).parent / "tests" / "fixtures"
            / "minecraft_installer-1.3.2-1-x86_64.hpkg")

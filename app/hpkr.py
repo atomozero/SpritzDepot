@@ -5,9 +5,8 @@ cichéto can point at an existing Haiku repo (NOT HaikuPorts) and spritz can
 resolve a package's download URL as `baseUrl + name-version-arch.hpkg`.
 
 Scope and honesty:
-  - Supports the heap compressions the format defines: none and zlib. (zstd is
-    a valid heap_compression value but is not implemented here; such a catalog
-    raises HpkrError rather than returning wrong data.)
+  - Heap compression none / zlib / zstd is handled (shared with hvif.py via
+    hpkg_heap.decompress_heap).
   - This is a *reader* for listing/resolving, not a full HPKG implementation.
 
 Format reference (verified against haiku/docs/develop/packages/FileFormat.rst):
@@ -17,11 +16,12 @@ Format reference (verified against haiku/docs/develop/packages/FileFormat.rst):
 from __future__ import annotations
 
 import struct
-import zlib
 from dataclasses import dataclass
 from typing import Optional
 
 import httpx
+
+from .hpkg_heap import HeapError, decompress_heap
 
 HPKR_MAGIC = b"hpkr"
 
@@ -126,18 +126,11 @@ class _Reader:
 
 
 def _decompress_heap(comp: int, raw: bytes, uncompressed_size: int) -> bytes:
-    """Decompress the heap. 0 = none, 1 = zlib (per the format)."""
-    if comp == 0:
-        return raw[:uncompressed_size]
-    if comp == 1:
-        # The heap is chunked, but zlib streams concatenate transparently for a
-        # straight decompress of the whole compressed region in practice; if a
-        # repo uses multiple chunks this may need per-chunk handling.
-        try:
-            return zlib.decompress(raw)
-        except zlib.error as e:
-            raise HpkrError(f"zlib heap decompress failed: {e}") from e
-    raise HpkrError(f"unsupported heap compression {comp} (only none/zlib supported)")
+    """Decompress the heap (none / zlib / zstd), via the shared helper."""
+    try:
+        return decompress_heap(comp, raw, uncompressed_size)
+    except HeapError as e:
+        raise HpkrError(str(e)) from e
 
 
 def _read_value(r: _Reader, data_type: int, encoding: int, strings: list):

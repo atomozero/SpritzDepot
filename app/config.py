@@ -6,8 +6,9 @@ Two secrets matter for security:
 
 The environment is selected by SPRITZ_ENV:
   - "dev"  (default): convenient fallbacks, but never silently insecure.
-                      A missing admin token leaves /ingest closed (403),
-                      not open. A warning is logged for the JWT fallback.
+                      A missing admin token leaves /ingest closed (503 when the
+                      token is unset, 401 on a wrong token), not open. A warning
+                      is logged for the JWT fallback.
   - "prod"          : both secrets are required. check_prod_config() is
                       called at startup and raises if either is missing or
                       still set to a development default, so the process

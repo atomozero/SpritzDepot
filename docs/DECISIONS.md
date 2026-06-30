@@ -201,8 +201,9 @@ The parser was verified against a real HPKR built by Haiku's `package_repo`
 (fixture tests/fixtures/sample.hpkr); getting it right meant matching three
 binary details from the Haiku source: attribute integers are big-endian, the
 string table ends with a 0-byte terminator, and the attribute type enum is
-INT=1/UINT=2/STRING=3/RAW=4 (not 0-based). Heap zlib + uncompressed supported;
-zstd raises rather than guessing. No sha256 (client verifies, like ombra).
+INT=1/UINT=2/STRING=3/RAW=4 (not 0-based). Heap none/zlib/zstd are all handled
+via the shared `app/hpkg_heap.decompress_heap` (also used by hvif.py). No sha256
+(client verifies, like ombra).
 
 **App icons extracted from hpkg, rendered with hvif2png, on-demand + capped.**
 Haiku icons are HVIF (a vector format) in a BEOS:ICON attribute inside the hpkg;

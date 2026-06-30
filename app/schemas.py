@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Optional
 
 import yaml
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class Kind(str, Enum):
@@ -81,10 +81,11 @@ class Cicheto(BaseModel):
     packager: Optional[Packager] = None
     bridge: Optional[Bridge] = None
 
-    channels: dict[str, Channel]     # at least one, keyed by channel name
+    # At least one channel, keyed by channel name. min_length enforces it
+    # (a cichéto with no channels is meaningless: nothing to install).
+    channels: dict[str, Channel] = Field(min_length=1)
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 def cicheto_to_yaml(c: "Cicheto") -> str:

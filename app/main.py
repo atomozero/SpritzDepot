@@ -14,10 +14,13 @@ daemon this is a wishlist; with it, it's remote install.
 from __future__ import annotations
 
 import secrets
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import httpx
+
+from contextlib import asynccontextmanager
 
 from fastapi import (Depends, FastAPI, File, Header, HTTPException, Query,
                      Request, UploadFile, status)
@@ -36,7 +39,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from . import config, hpkr, hvif, ombra, repo_proxy, uploads
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
-from .config import ADMIN_TOKEN, check_prod_config
+from .config import check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_directory, ingest_git, list_bacari
 from .models import Bacaro, CichetoRow, InstallState, User
@@ -46,7 +49,17 @@ from .schemas import Cicheto, cicheto_to_yaml
 # Redis in prod for multi-process correctness.
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="spritz registry", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Refuse to start with insecure config in prod (warns in dev), then ensure
+    # the schema exists.
+    check_prod_config()
+    init_db()
+    yield
+
+
+app = FastAPI(title="spritz registry", version="0.1.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -86,28 +99,23 @@ templates = Jinja2Templates(directory=str(_HERE / "templates"))
 app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
 
-@app.on_event("startup")
-def _startup() -> None:
-    # Refuse to start with insecure config in prod (warns in dev).
-    check_prod_config()
-    init_db()
-
-
 # ---------- admin guard ----------
 
 def require_admin(x_admin_token: Optional[str] = Header(default=None)) -> None:
     """Gate admin-only endpoints behind a shared token.
 
-    The token is read from SPRITZ_ADMIN_TOKEN (app.config). If it is unset,
-    the endpoint is closed entirely (503) rather than open to anyone. The
-    comparison is timing-safe.
+    The token is read from SPRITZ_ADMIN_TOKEN (app.config), looked up
+    dynamically so tests and config changes take effect. If it is unset, the
+    endpoint is closed entirely (503) rather than open to anyone. The comparison
+    is timing-safe.
     """
-    if not ADMIN_TOKEN:
+    admin_token = config.ADMIN_TOKEN
+    if not admin_token:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             "Admin endpoint disabled: SPRITZ_ADMIN_TOKEN is not configured",
         )
-    if not x_admin_token or not secrets.compare_digest(x_admin_token, ADMIN_TOKEN):
+    if not x_admin_token or not secrets.compare_digest(x_admin_token, admin_token):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             "Invalid or missing admin token",
@@ -411,6 +419,7 @@ def queue_install(cicheto_id: str, body: QueueBody,
         existing.state = "pending"
         existing.channel = body.channel
         existing.arch = body.arch
+        existing.updated_at = datetime.utcnow()
         session.add(existing)
     else:
         session.add(InstallState(
@@ -490,6 +499,7 @@ def mark_installed(cicheto_id: str,
     if not row:
         raise HTTPException(404, "Not in library")
     row.state = "installed"
+    row.updated_at = datetime.utcnow()
     session.add(row)
     session.commit()
     return {"status": "installed", "cicheto": cicheto_id}
@@ -537,7 +547,6 @@ def _record_bacaro(session: Session, slug: str, git_url: str,
                    ingested: int = 0, removed: int = 0,
                    error: Optional[str] = None) -> None:
     """Upsert the operational record for a tap after a crawl."""
-    from datetime import datetime
     row = session.get(Bacaro, slug) or Bacaro(slug=slug)
     row.git_url = git_url or row.git_url
     row.last_ingested_at = datetime.utcnow()

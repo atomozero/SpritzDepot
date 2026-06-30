@@ -112,6 +112,7 @@ app/
   ombra.py       resolver canale ombra (ultima release GitHub dell'autore)
   hpkr.py        lettore catalogo HPKR (risolve hpkg da repo Haiku di terze parti)
   hvif.py        estrae l'icona HVIF da un hpkg e la converte in PNG (via hvif2png)
+  hpkg_heap.py   decompressione heap condivisa (none/zlib/zstd) per hpkr e hvif
   repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
   main.py        route FastAPI (API + frontend)
   templates/     pagine Jinja (home, app, get-spritz)
