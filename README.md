@@ -92,7 +92,7 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
 | `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | URL del database. In prod puntalo a Postgres (vedi `migrations/`). |
 | `SPRITZ_HVIF2PNG_BIN` | non impostata | Path al tool `hvif2png` di Haiku per estrarre le icone dagli hpkg (vedi `docs/SETUP-WSL.md`). Senza, `/icon` risponde 404 e il frontend usa il placeholder. |
-| `SPRITZ_MAX_HPKG_ICON_BYTES` | `20971520` (20MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
+| `SPRITZ_MAX_HPKG_ICON_BYTES` | `104857600` (100MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`

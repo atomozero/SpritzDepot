@@ -69,7 +69,7 @@ MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5 MB
 # larger than this just to pull an icon out of it.
 HVIF2PNG_BIN = os.environ.get("SPRITZ_HVIF2PNG_BIN")
 MAX_HPKG_FETCH_FOR_ICON = int(
-    os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(20 * 1024 * 1024)))  # 20 MB
+    os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(100 * 1024 * 1024)))  # 100 MB
 
 
 def check_prod_config() -> None:
