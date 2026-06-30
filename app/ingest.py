@@ -3,7 +3,7 @@
 A bàcaro is a git repo (or a local directory for testing) containing
 *.yaml / *.yml cichéto files. This module clones/pulls it, validates
 every file against the Cicheto schema, and upserts the valid ones into
-the DB cache. Invalid files are reported and skipped — the cache never
+the DB cache. Invalid files are reported and skipped, so the cache never
 holds malformed manifests.
 
 Source of truth = the git repo. The DB = a rebuildable projection.
@@ -45,7 +45,7 @@ def _validate_git_url(git_url: str) -> None:
     if scheme == "https":
         return
     if scheme in ("", "file"):
-        # A bare path (no scheme) or file:// — local. Dev only.
+        # A bare path (no scheme) or file:// (local). Dev only.
         if config.IS_PROD:
             raise IngestError("local/file bàcaro URLs are not allowed in prod")
         return

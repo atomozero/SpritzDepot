@@ -1,4 +1,4 @@
-"""Cichéto schema — the manifest format.
+"""Cichéto schema: the manifest format.
 
 This is the contract a bàcaro (a git repo of YAML files) must satisfy.
 The server parses each .yaml/.yml against these models; anything that

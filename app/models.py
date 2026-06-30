@@ -58,7 +58,7 @@ class Bacaro(SQLModel, table=True):
 
 
 class InstallState(SQLModel, table=True):
-    """A user's library entry — the 'Play Store' queue.
+    """A user's library entry: the 'Play Store' queue.
 
     state: 'pending'  -> queued from the web, daemon hasn't acted yet
            'installed'-> daemon confirmed it landed
