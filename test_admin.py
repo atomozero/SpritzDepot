@@ -69,4 +69,20 @@ assert not [r for r in c.get("/admin/bacari", headers=ADMIN).json()
             if r["slug"] == "vepro"], "Bacaro record not gone"
 print("delete bàcaro      -> ok (cichéti + record removed)")
 
-print("\nPASS: admin page + bàcaro records + delete")
+# --- first user becomes admin; admin login passes the gate (no token) ---
+admin_tok = c.post("/auth/register",
+                   json={"email": "boss@x.io", "password": "longenough1"}).json()["access_token"]
+admin_auth = {"Authorization": f"Bearer {admin_tok}"}
+# the admin user reaches an admin-only endpoint WITHOUT X-Admin-Token
+assert c.get("/admin/bacari", headers=admin_auth).status_code == 200, "admin user gate"
+# a second user is NOT admin and is rejected on the same endpoint
+normal_tok = c.post("/auth/register",
+                    json={"email": "normal@x.io", "password": "longenough1"}).json()["access_token"]
+assert c.get("/admin/bacari",
+             headers={"Authorization": f"Bearer {normal_tok}"}).status_code == 401, \
+    "non-admin user must be rejected"
+# the shared token still works alongside
+assert c.get("/admin/bacari", headers=ADMIN).status_code == 200
+print("admin bootstrap    -> ok (first user admin, others not, token still works)")
+
+print("\nPASS: admin page + bàcaro records + delete + admin users")

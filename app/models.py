@@ -41,6 +41,9 @@ class User(SQLModel, table=True):
     # rejected. This is the revocation mechanism (logout-everywhere, on a
     # password change, or on compromise).
     token_version: int = Field(default=0)
+    # The first user to register becomes admin (bootstrap); the rest are normal.
+    # Admin users pass the admin gate alongside SPRITZ_ADMIN_TOKEN.
+    is_admin: bool = Field(default=False)
 
 
 class Bacaro(SQLModel, table=True):

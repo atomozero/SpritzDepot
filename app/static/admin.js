@@ -7,8 +7,15 @@
   function token() {
     return (document.getElementById("admin-token").value || "").trim();
   }
+  function userToken() {
+    return (window.spritzAuth && window.spritzAuth.getToken()) || "";
+  }
   function need() {
-    if (!token()) { alert("Incolla prima il token admin."); return false; }
+    // Either an admin token in the field, or a logged-in (admin) user.
+    if (!token() && !userToken()) {
+      alert("Accedi come admin, oppure incolla il token admin.");
+      return false;
+    }
     return true;
   }
 
@@ -16,7 +23,8 @@
     opts = opts || {};
     var xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
-    xhr.setRequestHeader("X-Admin-Token", token());
+    if (token()) xhr.setRequestHeader("X-Admin-Token", token());
+    if (userToken()) xhr.setRequestHeader("Authorization", "Bearer " + userToken());
     if (opts.json) xhr.setRequestHeader("Content-Type", "application/json");
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;

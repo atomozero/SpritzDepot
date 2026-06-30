@@ -12,10 +12,11 @@
   <section class="install">
     <h2>Token admin</h2>
     <p class="hint">
-      Il token e' il valore di <code>SPRITZ_ADMIN_TOKEN</code> impostato
-      all'avvio del server. Non e' un account utente: e' la chiave operativa del
-      registro. In sviluppo coincide con quello passato all'avvio (es.
-      <code>devtoken</code>); in produzione e' un valore segreto.
+      Se hai fatto <a href="/login">login</a> con un account admin (il primo
+      utente registrato lo e'), questo campo non serve: le azioni usano il tuo
+      accesso. In alternativa incolla il token: e' il valore di
+      <code>SPRITZ_ADMIN_TOKEN</code> impostato all'avvio del server (la chiave
+      operativa del registro, non un account; in sviluppo es. <code>devtoken</code>).
     </p>
     <p>
       <input type="password" id="admin-token" placeholder="X-Admin-Token"

@@ -37,8 +37,10 @@ from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads
+from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
+from jose import JWTError, jwt
 from .config import check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_directory, ingest_git, list_bacari
@@ -148,26 +150,55 @@ def set_lang(lang: str, request: Request):
 
 # ---------- admin guard ----------
 
-def require_admin(x_admin_token: Optional[str] = Header(default=None)) -> None:
-    """Gate admin-only endpoints behind a shared token.
+def _bearer_admin_user(authorization: Optional[str],
+                       session: Session) -> Optional[User]:
+    """Return the User if the Authorization bearer is a valid token for an
+    is_admin account, else None. Never raises (it is one of two accepted ways)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization[7:].strip()
+    try:
+        payload = jwt.decode(token, auth_config.SECRET_KEY, algorithms=[auth_config.ALGORITHM])
+        user_id = int(payload.get("sub"))
+        token_ver = int(payload.get("ver", 0))
+    except (JWTError, TypeError, ValueError):
+        return None
+    user = session.get(User, user_id)
+    if user is None or token_ver != user.token_version or not user.is_admin:
+        return None
+    return user
 
-    The token is read from SPRITZ_ADMIN_TOKEN (app.config), looked up
-    dynamically so tests and config changes take effect. If it is unset, the
-    endpoint is closed entirely (503) rather than open to anyone. The comparison
-    is timing-safe.
-    """
+
+def require_admin(x_admin_token: Optional[str] = Header(default=None),
+                  authorization: Optional[str] = Header(default=None),
+                  session: Session = Depends(get_session)) -> None:
+    """Gate admin-only endpoints. Two accepted ways:
+      - the shared SPRITZ_ADMIN_TOKEN via the X-Admin-Token header (service /
+        CI / bootstrap), or
+      - a logged-in user whose account is is_admin (browser).
+    The token compare is timing-safe; an unset token simply disables that path
+    (the admin-user path can still work)."""
     admin_token = config.ADMIN_TOKEN
-    if not admin_token:
+    if (admin_token and x_admin_token
+            and secrets.compare_digest(x_admin_token, admin_token)):
+        return
+    if _bearer_admin_user(authorization, session) is not None:
+        return
+    # Neither way worked. 503 only if NO admin path exists at all.
+    if not admin_token and _no_users_exist(session):
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
-            "Admin endpoint disabled: SPRITZ_ADMIN_TOKEN is not configured",
+            "Admin disabled: set SPRITZ_ADMIN_TOKEN or register the first user",
         )
-    if not x_admin_token or not secrets.compare_digest(x_admin_token, admin_token):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "Invalid or missing admin token",
-            headers={"WWW-Authenticate": "X-Admin-Token"},
-        )
+    raise HTTPException(
+        status.HTTP_401_UNAUTHORIZED,
+        "Admin access required (X-Admin-Token or an admin login)",
+        headers={"WWW-Authenticate": "X-Admin-Token"},
+    )
+
+
+def _no_users_exist(session: Session) -> bool:
+    return session.exec(select(User.id).limit(1)).first() is None
 
 
 # ---------- request/response bodies ----------
@@ -228,7 +259,10 @@ def register(request: Request, body: RegisterBody,
     exists = session.exec(select(User).where(User.email == body.email)).first()
     if exists:
         raise HTTPException(409, "Email already registered")
-    user = User(email=body.email, password_hash=hash_password(body.password))
+    # Bootstrap: the very first user to register becomes admin.
+    first_user = session.exec(select(User.id).limit(1)).first() is None
+    user = User(email=body.email, password_hash=hash_password(body.password),
+                is_admin=first_user)
     session.add(user)
     session.commit()
     session.refresh(user)
