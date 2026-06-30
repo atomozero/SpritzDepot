@@ -72,6 +72,8 @@ a:hover { text-decoration: underline; }
 .btn-fallback:hover, .btn-bootstrap:hover { background: #f1f5f9; }
 .btn-deeplink { background: #16a34a; }
 .btn-deeplink:hover { background: #15803d; }
+.btn-danger { background: #dc2626; }
+.btn-danger:hover { background: #b91c1c; }
 
 .content { max-width: 1000px; margin: 0 auto; padding: 0 20px 32px; }
 

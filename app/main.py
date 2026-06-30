@@ -574,6 +574,22 @@ def bacari():
     return list_bacari()
 
 
+@app.delete("/bacari/{slug}", dependencies=[Depends(require_admin)])
+def delete_bacaro(slug: str, session: Session = Depends(get_session)):
+    """Admin: remove a tap from the cache. Deletes every cichéto attributed to
+    `slug` and its operational Bacaro record. The git repo (the source of truth)
+    is untouched; a future re-ingest of the same URL brings it back."""
+    cicheti = session.exec(
+        select(CichetoRow).where(CichetoRow.bacaro == slug)).all()
+    for c in cicheti:
+        session.delete(c)
+    rec = session.get(Bacaro, slug)
+    if rec:
+        session.delete(rec)
+    session.commit()
+    return {"deleted_bacaro": slug, "removed_cicheti": len(cicheti)}
+
+
 class ImportHpkrBody(BaseModel):
     repo_url: str          # base URL of a third-party Haiku repo (NOT HaikuPorts)
     bacaro: str            # slug to attribute the imported cichéti to
@@ -937,8 +953,8 @@ def _hpkg_url_for_icon(row: CichetoRow) -> Optional[str]:
 @app.get("/icon/{cicheto_id}")
 def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
     """Serve an app's icon as PNG, extracted from its hpkg (cached). 404 when
-    no icon is available, the package is too big, or hvif2png is not configured
-    — the frontend then shows its generated placeholder."""
+    no icon is available, the package is too big, or hvif2png is not configured;
+    the frontend then shows its generated placeholder."""
     if "/" in cicheto_id or "\\" in cicheto_id:
         raise HTTPException(400, "bad id")
     cache = Path(config.UPLOAD_DIR) / "icons" / f"{cicheto_id}.png"

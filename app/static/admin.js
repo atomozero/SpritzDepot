@@ -135,6 +135,23 @@
     };
     if (!r.git_url) { btn.disabled = true; btn.title = "URL non memorizzato"; }
     td.appendChild(btn);
+
+    var del = document.createElement("button");
+    del.className = "btn btn-danger";
+    del.textContent = "Elimina";
+    del.style.marginLeft = "6px";
+    del.onclick = function () {
+      if (!confirm("Eliminare il bacaro '" + r.slug + "' e tutte le sue app dal "
+                   + "catalogo? Il repo originale non viene toccato.")) return;
+      var s = document.getElementById("admin-status");
+      s.textContent = "Eliminazione...";
+      req("DELETE", "/bacari/" + encodeURIComponent(r.slug), function (data) {
+        s.textContent = "Eliminato '" + data.deleted_bacaro + "' ("
+          + data.removed_cicheti + " app rimosse).";
+        loadBacari();
+      });
+    };
+    td.appendChild(del);
     tr.appendChild(td);
     if (r.last_error) {
       tr.title = "Ultimo errore: " + r.last_error;

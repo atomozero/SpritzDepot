@@ -56,4 +56,17 @@ badrec = [r for r in c.get("/admin/bacari", headers=ADMIN).json()
 assert badrec and badrec[0]["last_error"], badrec
 print("error record       -> ok")
 
-print("\nPASS: admin page + bàcaro records")
+# DELETE /bacari/{slug}: admin-gated, removes the tap's cichéti and record
+assert c.delete("/bacari/vepro").status_code == 401, "delete must require admin"
+# vepro has at least the seeded cichéto(s) from sample-bacaro
+before = len(c.get("/search?bacaro=vepro").json()["results"])
+assert before >= 1, "expected vepro cichéti before delete"
+d = c.delete("/bacari/vepro", headers=ADMIN)
+assert d.status_code == 200, d.text
+assert d.json()["removed_cicheti"] == before, d.json()
+assert c.get("/search?bacaro=vepro").json()["results"] == [], "cichéti not gone"
+assert not [r for r in c.get("/admin/bacari", headers=ADMIN).json()
+            if r["slug"] == "vepro"], "Bacaro record not gone"
+print("delete bàcaro      -> ok (cichéti + record removed)")
+
+print("\nPASS: admin page + bàcaro records + delete")
