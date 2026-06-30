@@ -58,6 +58,12 @@ assert "Genio" in hf and "editors" in hf  # filtered-by-category view
 assert "/?category=editors" in c.get("/?q=genio").text, "category badge must be a link"
 print("categories+filters -> ok")
 
+# Add-to-library button on the app page
+_ap = c.get("/app/org.haiku.genio").text
+assert 'id="lib-add"' in _ap and "library-add.js" in _ap, "add-to-library button missing"
+assert c.get("/static/library-add.js").status_code == 200
+print("add-to-library     -> ok")
+
 # App page
 ap = c.get("/app/org.haiku.genio")
 assert ap.status_code == 200, ap.text

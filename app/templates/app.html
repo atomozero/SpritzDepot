@@ -70,6 +70,14 @@
     {% endfor %}
   </section>
 
+  <section class="install" id="library-box" data-cicheto="{{ app.id }}"
+           data-msg-login="{{ t('lib.login_first') }}"
+           data-msg-added="{{ t('lib.added') }}"
+           data-msg-error="{{ t('lib.error') }}">
+    <button id="lib-add" class="btn">{{ t('lib.add') }}</button>
+    <span class="hint" id="lib-status"></span>
+  </section>
+
   <section class="app-info">
     {% if app.author %}
     <p><strong>{{ t('app.author') }}:</strong> {{ app.author.name }}
@@ -99,4 +107,5 @@
 </article>
 
 <script src="/static/install-button.js"></script>
+<script src="/static/library-add.js"></script>
 {% endblock %}

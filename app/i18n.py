@@ -80,6 +80,10 @@ STRINGS: dict[str, dict[str, str]] = {
     'login.min_chars': {"it": 'Almeno 8 caratteri.', "es": 'Al menos 8 caracteres.', "de": 'Mindestens 8 Zeichen.', "zh": '至少 8 个字符。', "nl": 'Minstens 8 tekens.', "fr": 'Au moins 8 caractères.', "ja": '8 文字以上。', "vec": 'Almanco 8 caràteri.'},
     'login.register': {"it": 'Registrati', "es": 'Registrarse', "de": 'Registrieren', "zh": '注册', "nl": 'Registreren', "fr": "S'inscrire", "ja": '登録', "vec": 'Registrate'},
     'lang.label': {"it": 'Lingua', "es": 'Idioma', "de": 'Sprache', "zh": '语言', "nl": 'Taal', "fr": 'Langue', "ja": '言語', "vec": 'Lengua'},
+    'lib.add': {"it": 'Aggiungi alla libreria', "es": 'Añadir a la biblioteca', "de": 'Zur Bibliothek hinzufügen', "zh": '添加到库', "nl": 'Aan bibliotheek toevoegen', "fr": 'Ajouter à la bibliothèque', "ja": 'ライブラリに追加', "vec": 'Zonta a la libraria'},
+    'lib.login_first': {"it": 'Accedi per aggiungere alla libreria.', "es": 'Accede para añadir a la biblioteca.', "de": 'Anmelden, um zur Bibliothek hinzuzufügen.', "zh": '请登录以添加到库。', "nl": 'Log in om aan de bibliotheek toe te voegen.', "fr": 'Connectez-vous pour ajouter à la bibliothèque.', "ja": 'ライブラリに追加するにはログインしてください。', "vec": 'Entra par zontar a la libraria.'},
+    'lib.added': {"it": 'Aggiunta alla libreria.', "es": 'Añadida a la biblioteca.', "de": 'Zur Bibliothek hinzugefügt.', "zh": '已添加到库。', "nl": 'Toegevoegd aan bibliotheek.', "fr": 'Ajoutée à la bibliothèque.', "ja": 'ライブラリに追加しました。', "vec": 'Zontà a la libraria.'},
+    'lib.error': {"it": 'Errore.', "es": 'Error.', "de": 'Fehler.', "zh": '错误。', "nl": 'Fout.', "fr": 'Erreur.', "ja": 'エラー。', "vec": 'Eror.'},
 }
 
 
