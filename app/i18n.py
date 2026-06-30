@@ -84,6 +84,10 @@ STRINGS: dict[str, dict[str, str]] = {
     'lib.login_first': {"it": 'Accedi per aggiungere alla libreria.', "es": 'Accede para añadir a la biblioteca.', "de": 'Anmelden, um zur Bibliothek hinzuzufügen.', "zh": '请登录以添加到库。', "nl": 'Log in om aan de bibliotheek toe te voegen.', "fr": 'Connectez-vous pour ajouter à la bibliothèque.', "ja": 'ライブラリに追加するにはログインしてください。', "vec": 'Entra par zontar a la libraria.'},
     'lib.added': {"it": 'Aggiunta alla libreria.', "es": 'Añadida a la biblioteca.', "de": 'Zur Bibliothek hinzugefügt.', "zh": '已添加到库。', "nl": 'Toegevoegd aan bibliotheek.', "fr": 'Ajoutée à la bibliothèque.', "ja": 'ライブラリに追加しました。', "vec": 'Zontà a la libraria.'},
     'lib.error': {"it": 'Errore.', "es": 'Error.', "de": 'Fehler.', "zh": '错误。', "nl": 'Fout.', "fr": 'Erreur.', "ja": 'エラー。', "vec": 'Eror.'},
+    'lib.remove': {"it": 'Rimuovi', "es": 'Quitar', "de": 'Entfernen', "zh": '移除', "nl": 'Verwijderen', "fr": 'Retirer', "ja": '削除', "vec": 'Cava via'},
+    'lib.state.pending': {"it": 'in coda', "es": 'en cola', "de": 'in Warteschlange', "zh": '队列中', "nl": 'in wachtrij', "fr": "en file d'attente", "ja": '待機中', "vec": 'in coa'},
+    'lib.state.installed': {"it": 'installata', "es": 'instalada', "de": 'installiert', "zh": '已安装', "nl": 'geïnstalleerd', "fr": 'installée', "ja": 'インストール済み', "vec": 'instalà'},
+    'lib.state.removed': {"it": 'rimossa', "es": 'quitada', "de": 'entfernt', "zh": '已移除', "nl": 'verwijderd', "fr": 'retirée', "ja": '削除済み', "vec": 'cavà via'},
 }
 
 

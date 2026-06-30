@@ -6,11 +6,14 @@
   var btn = document.getElementById("load");
   if (!btn) return;
 
+  // Labels come from data-* on #result so they can be translated server-side.
+  var R = document.getElementById("result");
   var STATE_LABEL = {
-    pending: "in coda",
-    installed: "installata",
-    removed: "rimossa"
+    pending: (R && R.getAttribute("data-s-pending")) || "in coda",
+    installed: (R && R.getAttribute("data-s-installed")) || "installata",
+    removed: (R && R.getAttribute("data-s-removed")) || "rimossa"
   };
+  var REMOVE_LABEL = (R && R.getAttribute("data-s-remove")) || "Rimuovi";
 
   // Prefill the token field from the stored login, if any.
   if (window.spritzAuth && window.spritzAuth.getToken()) {
@@ -74,10 +77,39 @@
       meta.appendChild(badge("badge-channel", it.channel));
       if (it.arch) meta.appendChild(badge("badge", it.arch));
       meta.appendChild(badge("badge-bridge", STATE_LABEL[it.state] || it.state));
-      li.appendChild(meta);
 
+      var rm = document.createElement("button");
+      rm.className = "btn btn-danger";
+      rm.style.marginLeft = "8px";
+      rm.style.padding = "3px 10px";
+      rm.style.fontSize = "13px";
+      rm.textContent = REMOVE_LABEL;
+      rm.onclick = (function (cid) {
+        return function () { removeFromLibrary(cid); };
+      })(it.cicheto);
+      meta.appendChild(rm);
+
+      li.appendChild(meta);
       list.appendChild(li);
     }
+  }
+
+  function removeFromLibrary(cid) {
+    var tok = (document.getElementById("token").value || "").trim() ||
+              (window.spritzAuth ? window.spritzAuth.getToken() : "");
+    if (!tok) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/library/" + encodeURIComponent(cid) + "/remove", true);
+    xhr.setRequestHeader("Authorization", "Bearer " + tok);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        btn.click();  // reload the list
+      } else if (xhr.status === 401) {
+        alert("Sessione scaduta, riaccedi.");
+      }
+    };
+    xhr.send();
   }
 
   function badge(cls, text) {

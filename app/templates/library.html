@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Le mie app - spritz{% endblock %}
+{% block title %}{{ t('nav.my_apps') }} - spritz{% endblock %}
 
 {% block content %}
 <article class="app-detail">
-  <h1>Le mie app</h1>
+  <h1>{{ t('nav.my_apps') }}</h1>
   <p class="lead">
     Le app che hai messo in libreria. Quando il client spritz nativo e' attivo,
     le installa e ne aggiorna lo stato (in coda, installata).
@@ -21,8 +21,12 @@
     </p>
   </section>
 
-  <section class="install" id="result" style="display:none;">
-    <h2>Libreria</h2>
+  <section class="install" id="result" style="display:none;"
+           data-s-remove="{{ t('lib.remove') }}"
+           data-s-pending="{{ t('lib.state.pending') }}"
+           data-s-installed="{{ t('lib.state.installed') }}"
+           data-s-removed="{{ t('lib.state.removed') }}">
+    <h2>{{ t('nav.my_apps') }}</h2>
     <ul class="app-list" id="lib-list"></ul>
     <p class="empty" id="lib-empty" style="display:none;">
       La tua libreria e' vuota. Sfoglia il <a href="/">catalogo</a> e aggiungi

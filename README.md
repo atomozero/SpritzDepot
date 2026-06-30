@@ -141,6 +141,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | GET  | `/login` | pagina di accesso/registrazione (web) |
 | GET  | `/library-page` | pagina "le mie app" (web) |
 | POST | `/library/{id}` | accoda install (auth) |
+| POST | `/library/{id}/remove` | togli dalla libreria (auth) |
 | GET  | `/library/pending` | demone fa polling (auth) |
 | POST | `/library/{id}/installed` | demone conferma (auth) |
 | GET  | `/library` | "le mie app" (auth) |

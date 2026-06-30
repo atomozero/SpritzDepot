@@ -526,6 +526,24 @@ def my_library(user: User = Depends(current_user),
     return out
 
 
+@app.post("/library/{cicheto_id}/remove")
+def remove_from_library(cicheto_id: str,
+                        user: User = Depends(current_user),
+                        session: Session = Depends(get_session)):
+    """Remove an app from the user's library (un-queue). Deletes the entry; a
+    fresh add re-queues it. Idempotent: removing something not there is fine."""
+    row = session.exec(
+        select(InstallState).where(
+            InstallState.user_id == user.id,
+            InstallState.cicheto_id == cicheto_id,
+        )
+    ).first()
+    if row:
+        session.delete(row)
+        session.commit()
+    return {"status": "removed", "cicheto": cicheto_id}
+
+
 @app.get("/library/pending")
 def pending(user: User = Depends(current_user),
             session: Session = Depends(get_session)):

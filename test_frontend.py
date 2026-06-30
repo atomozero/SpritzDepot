@@ -182,7 +182,13 @@ c.post("/library/org.haiku.genio", json={"channel": "stable", "arch": "x86_64"},
        headers=_la)
 lib = c.get("/library", headers=_la).json()
 assert lib and lib[0]["name"] == "Genio" and lib[0]["state"] == "pending", lib
-print("my-apps library    -> ok")
+# remove it again -> library empty; idempotent; needs auth
+assert c.post("/library/org.haiku.genio/remove", headers=_la).status_code == 200
+assert c.get("/library", headers=_la).json() == [], "remove should empty the library"
+assert c.post("/library/org.haiku.genio/remove", headers=_la).status_code == 200  # idempotent
+assert c.post("/library/org.haiku.genio/remove").status_code == 401  # needs auth
+assert 'data-s-remove' in c.get("/library-page").text
+print("my-apps library    -> ok (add + remove)")
 
 # Italian copy + no em dashes in templates (project rule)
 for tmpl in Path("app/templates").glob("*.html"):
