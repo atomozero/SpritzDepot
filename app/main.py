@@ -98,6 +98,17 @@ _HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=str(_HERE / "templates"))
 app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
+# Cache-busting token for static assets: the CSS file's mtime. Appended as
+# ?v=... so a changed stylesheet is always re-fetched, never served stale from
+# the browser cache. Exposed to every template as `asset_version`.
+def _asset_version() -> str:
+    try:
+        return str(int((_HERE / "static" / "spritz.css").stat().st_mtime))
+    except OSError:
+        return "0"
+
+templates.env.globals["asset_version"] = _asset_version()
+
 
 # ---------- admin guard ----------
 
