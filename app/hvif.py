@@ -44,11 +44,11 @@ def _extract_hvif(hpkg: bytes) -> bytes:
     # hpkg header: magic(4) header_size(2) version(2) total_size(8) minor(2)
     #   heap_compression(2) heap_chunk_size(4) heap_size_compressed(8)
     #   heap_size_uncompressed(8) ...
-    (_magic, header_size, _ver, _total, _minor, heap_comp, _chunk,
+    (_magic, header_size, _ver, _total, _minor, heap_comp, chunk_size,
      heap_comp_size, heap_uncomp_size) = struct.unpack_from(">4sHHQHHIQQ", hpkg, 0)
     heap_raw = hpkg[header_size:header_size + heap_comp_size]
     try:
-        heap = decompress_heap(heap_comp, heap_raw, heap_uncomp_size)
+        heap = decompress_heap(heap_comp, heap_raw, heap_uncomp_size, chunk_size)
     except HeapError as e:
         raise IconError(str(e)) from e
 

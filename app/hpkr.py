@@ -125,12 +125,6 @@ class _Reader:
         return s
 
 
-def _decompress_heap(comp: int, raw: bytes, uncompressed_size: int) -> bytes:
-    """Decompress the heap (none / zlib / zstd), via the shared helper."""
-    try:
-        return decompress_heap(comp, raw, uncompressed_size)
-    except HeapError as e:
-        raise HpkrError(str(e)) from e
 
 
 def _read_value(r: _Reader, data_type: int, encoding: int, strings: list):
@@ -269,7 +263,10 @@ def parse_catalog(blob: bytes) -> list:
         struct.unpack_from(">IIQQQ", blob, off)
 
     heap_raw = blob[header_size:header_size + heap_comp_size]
-    heap = _decompress_heap(heap_comp, heap_raw, heap_uncomp_size)
+    try:
+        heap = decompress_heap(heap_comp, heap_raw, heap_uncomp_size, chunk_size)
+    except HeapError as e:
+        raise HpkrError(str(e)) from e
 
     # The package-attributes section is at the end of the heap.
     pkg_section = heap[len(heap) - packages_length:]

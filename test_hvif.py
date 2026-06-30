@@ -22,8 +22,9 @@ assert decompress_heap(0, b"hello world", 5) == b"hello"
 assert decompress_heap(1, _zlib.compress(b"abc" * 10), 30) == b"abc" * 10
 import zstandard as _zstd
 assert decompress_heap(2, _zstd.ZstdCompressor().compress(b"xyz" * 10), 30) == b"xyz" * 10
+# unknown codec with comp len != uncompressed size (so it can't pass through)
 try:
-    decompress_heap(9, b"", 0)
+    decompress_heap(9, b"ab", 100)
     raise SystemExit("FAIL: unsupported compression accepted")
 except HeapError:
     pass
