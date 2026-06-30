@@ -14,7 +14,7 @@ need. Do not invent endpoints or formats beyond what is written here; if a Haiku
 API or the hpkg/packagefs behaviour is uncertain, say so and verify against the
 Haiku headers, do not guess.
 
-## What spritz is (framing — keep this in any user-facing text)
+## What spritz is (framing: keep this in any user-facing text)
 
 spritz is the rebuild of BeBits: a single searchable index of Haiku software
 that points back to the original authors instead of re-hosting binaries. It is
@@ -61,7 +61,7 @@ Bind `127.0.0.1:4242`. Keep it trivial: a liveness ping, no sensitive data, no
 auth needed. (If you must use a different port, that is fine, but 4242 is what
 the website currently probes; note the change so the web side can be updated.)
 Beware mixed content: an https web page calling http://127.0.0.1 is blocked by
-some browsers — document what WebPositive actually allows.
+some browsers; document what WebPositive actually allows.
 
 ## The registry HTTP API you consume
 
@@ -119,7 +119,7 @@ Returns the items to install:
 ```
 ombra items are already resolved live here (artifacts filled with the latest
 URLs), so you do not need an extra /resolve call for them. If an item comes back
-with empty `artifacts` and a `notes` entry, the live resolve failed upstream —
+with empty `artifacts` and a `notes` entry, the live resolve failed upstream:
 skip it and retry on the next poll, do not treat it as installable.
 ```
 POST /library/{id}/installed     (bearer)  -> mark it installed once it landed
