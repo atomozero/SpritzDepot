@@ -54,14 +54,20 @@ cd haiku
 # 3. configure for host tools only (no cross-tools, no OS image)
 ./configure --host-only
 
-# 4. build just the two host tools
+# 4. build the host tools we use
 jam -q '<build>package'
 jam -q '<build>package_repo'
+jam -q '<build>hvif2png'      # needs libpng-dev; renders Haiku HVIF icons to PNG
 # binaries land under:
 #   generated/objects/linux/x86_64/release/tools/package/package
 #   generated/objects/linux/x86_64/release/tools/package_repo/package_repo
+#   generated/objects/linux/x86_64/release/tools/hvif2png/hvif2png
 # run them with LD_LIBRARY_PATH=generated/objects/linux/lib
 ```
+
+`hvif2png` powers `/icon/{id}` (icon extraction from hpkg); point
+`SPRITZ_HVIF2PNG_BIN` at it. It is optional: without it the frontend just uses
+the generated placeholder.
 
 **One source fix is needed** under gcc 12: `src/kits/storage/sniffer/
 RPattern.cpp` uses `offsetof` without including `<cstddef>`, which is a fatal

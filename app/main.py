@@ -33,7 +33,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import config, hpkr, ombra, repo_proxy, uploads
+from . import config, hpkr, hvif, ombra, repo_proxy, uploads
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
 from .config import ADMIN_TOKEN, check_prod_config
@@ -904,6 +904,53 @@ def get_asset(filename: str):
     if not path.is_file():
         raise HTTPException(404, "asset not found")
     return FileResponse(path, media_type=uploads.content_type_for(filename))
+
+
+def _hpkg_url_for_icon(row: CichetoRow) -> Optional[str]:
+    """A downloadable hpkg URL for this app's stable channel, for icon extraction.
+    Handles pinned (artifact url) and hpkr-repo (resolve from the catalog)."""
+    stable = (row.raw.get("channels", {}) or {}).get("stable") or {}
+    arts = stable.get("artifacts") or {}
+    for art in arts.values():
+        if art.get("url"):
+            return art["url"]
+    if stable.get("source") == "hpkr-repo" and stable.get("repo_url"):
+        try:
+            resolved = hpkr.resolve_from_repo(
+                stable["repo_url"], stable.get("package") or row.name)
+            for art in resolved.values():
+                return art["url"]
+        except hpkr.HpkrError:
+            return None
+    return None
+
+
+@app.get("/icon/{cicheto_id}")
+def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
+    """Serve an app's icon as PNG, extracted from its hpkg (cached). 404 when
+    no icon is available, the package is too big, or hvif2png is not configured
+    — the frontend then shows its generated placeholder."""
+    if "/" in cicheto_id or "\\" in cicheto_id:
+        raise HTTPException(400, "bad id")
+    cache = Path(config.UPLOAD_DIR) / "icons" / f"{cicheto_id}.png"
+    if cache.is_file():
+        return FileResponse(cache, media_type="image/png")
+
+    if not hvif.tool_available():
+        raise HTTPException(404, "icon extraction not configured")
+    row = session.get(CichetoRow, cicheto_id)
+    if not row:
+        raise HTTPException(404, "Cichéto not found")
+    url = _hpkg_url_for_icon(row)
+    if not url:
+        raise HTTPException(404, "no hpkg to extract an icon from")
+    try:
+        png = hvif.icon_png_from_hpkg_url(url, size=64)
+    except hvif.IconError as e:
+        raise HTTPException(404, f"no icon: {e}")
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(png)
+    return FileResponse(cache, media_type="image/png")
 
 
 def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:

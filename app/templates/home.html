@@ -7,7 +7,10 @@
     {% if app.icon %}
     <img class="app-icon-sm" src="{{ app.icon }}" alt="">
     {% else %}
-    <span class="app-icon-placeholder">{{ app.name[0]|upper }}</span>
+    {# Try the extracted hpkg icon; on failure (404) swap to the placeholder. #}
+    <img class="app-icon-sm" src="/icon/{{ app.id }}" alt=""
+         onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
+    <span class="app-icon-placeholder" style="display:none;">{{ app.name[0]|upper }}</span>
     {% endif %}
     <span class="app-link-text">
       <span class="app-name">{{ app.name }}</span>

@@ -10,3 +10,4 @@ httpx
 slowapi
 jinja2
 alembic
+zstandard

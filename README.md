@@ -34,6 +34,10 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   clic) e altrimenti offre il repository da aggiungere in HaikuDepot. I badge
   categoria e bàcaro sono cliccabili; c'è una pagina `/categories` per sfogliare.
   Template Jinja leggeri, pensati per WebPositive.
+- **Icone delle app** (`/icon/{id}`). Estrae l'icona HVIF dall'hpkg dell'app, la
+  converte in PNG (via `hvif2png`) e la mette in cache. On-demand, con un limite
+  di dimensione per non scaricare hpkg enormi solo per l'icona: oltre soglia (o
+  senza il tool) il frontend mostra un placeholder con l'iniziale.
 - **Pagina di pubblicazione** (`/publish`, autenticata). L'autore compila un
   form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
   scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
@@ -87,6 +91,8 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale per il crawler ombra (alza il rate limit dell'API release). |
 | `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
 | `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | URL del database. In prod puntalo a Postgres (vedi `migrations/`). |
+| `SPRITZ_HVIF2PNG_BIN` | non impostata | Path al tool `hvif2png` di Haiku per estrarre le icone dagli hpkg (vedi `docs/SETUP-WSL.md`). Senza, `/icon` risponde 404 e il frontend usa il placeholder. |
+| `SPRITZ_MAX_HPKG_ICON_BYTES` | `20971520` (20MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
@@ -105,6 +111,7 @@ app/
   ingest.py      crawl bàcaro (git o cartella) → cache
   ombra.py       resolver canale ombra (ultima release GitHub dell'autore)
   hpkr.py        lettore catalogo HPKR (risolve hpkg da repo Haiku di terze parti)
+  hvif.py        estrae l'icona HVIF da un hpkg e la converte in PNG (via hvif2png)
   repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
   main.py        route FastAPI (API + frontend)
   templates/     pagine Jinja (home, app, get-spritz)
@@ -129,6 +136,7 @@ sample-bacaro/   cichéto d'esempio (Genio)
 | POST | `/publish` | genera cichéto YAML (auth) |
 | POST | `/upload/image` | carica icona/screenshot, ritorna URL (auth) |
 | GET  | `/assets/{file}` | serve un'immagine caricata |
+| GET  | `/icon/{id}` | icona dell'app estratta dall'hpkg (PNG, cache) |
 | GET  | `/login` | pagina di accesso/registrazione (web) |
 | GET  | `/library-page` | pagina "le mie app" (web) |
 | POST | `/library/{id}` | accoda install (auth) |

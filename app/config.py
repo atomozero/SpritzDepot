@@ -62,6 +62,14 @@ UPLOAD_DIR = os.environ.get("SPRITZ_UPLOAD_DIR",
 MAX_ICON_BYTES = 2 * 1024 * 1024        # 2 MB
 MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5 MB
 
+# Icon extraction from hpkg (Haiku HVIF icon -> PNG). hvif2png is a host-built
+# Haiku tool (see docs/SETUP-WSL.md); without it, icon extraction is skipped and
+# the frontend shows the generated placeholder. We refuse to download an hpkg
+# larger than this just to pull an icon out of it.
+HVIF2PNG_BIN = os.environ.get("SPRITZ_HVIF2PNG_BIN")
+MAX_HPKG_FETCH_FOR_ICON = int(
+    os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(20 * 1024 * 1024)))  # 20 MB
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.

@@ -204,6 +204,18 @@ string table ends with a 0-byte terminator, and the attribute type enum is
 INT=1/UINT=2/STRING=3/RAW=4 (not 0-based). Heap zlib + uncompressed supported;
 zstd raises rather than guessing. No sha256 (client verifies, like ombra).
 
+**App icons extracted from hpkg, rendered with hvif2png, on-demand + capped.**
+Haiku icons are HVIF (a vector format) in a BEOS:ICON attribute inside the hpkg;
+browsers can't render HVIF. `app/hvif.py` fetches the hpkg, decompresses its
+heap (zstd or zlib), locates the 'ncif' HVIF blob, and renders it to PNG with
+Haiku's host-built `hvif2png` (compiles in WSL, needs libpng-dev). `/icon/{id}`
+does this on first request and caches the PNG; it refuses packages over
+`SPRITZ_MAX_HPKG_ICON_BYTES` (default 20MB, so e.g. blender's 53MB is skipped)
+and 404s when the tool is absent. The frontend tries `/icon/{id}` and falls
+back to a generated initial-on-gradient placeholder on 404. Verified end to end
+against a real package (minecraft_installer from the lote repo). zstd needed the
+`zstandard` Python package; hpkg heaps use it, HPKR repo catalogs used zlib.
+
 ## Open (resolve and record here)
 
 - **HaikuDepot and duplicate packages across repos.** phoudoin was unsure
