@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ t('e404.title') }} - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail" style="max-width:640px; text-align:center;">
+  <p style="font-size:64px; margin:8px 0; color:#cbd5e1;">404</p>
+  <h1>{{ t('e404.title') }}</h1>
+  <p class="lead">{{ t('e404.lead') }}</p>
+  <p class="hint">{{ t('e404.osdrawer') }}</p>
+  <p style="margin-top:22px;">
+    <a class="btn" href="/">{{ t('e404.home') }}</a>
+    <a class="btn btn-fallback" href="/categories">{{ t('nav.categories') }}</a>
+  </p>
+</article>
+{% endblock %}

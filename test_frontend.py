@@ -99,6 +99,13 @@ assert sl.status_code == 303 and "lang=es" in sl.headers.get("set-cookie", "")
 c.cookies.delete("lang")
 print("i18n               -> ok")
 
+# Friendly 404 for browsers, JSON for API clients
+h404 = c.get("/app/nope.nope", headers={"Accept": "text/html"})
+assert h404.status_code == 404 and "OSDrawer" in h404.text, "themed 404 missing"
+j404 = c.get("/cicheto/nope.nope", headers={"Accept": "application/json"})
+assert j404.status_code == 404 and "<html" not in j404.text, "API 404 must stay JSON"
+print("404 pages          -> ok")
+
 # Haiku SVG placeholder (used when an app has no extractable icon)
 ph = c.get("/placeholder.svg?name=Blender")
 assert ph.status_code == 200 and ph.headers["content-type"].startswith("image/svg")

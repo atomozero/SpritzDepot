@@ -35,6 +35,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import JSONResponse
 
 from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads
 from . import auth as auth_config
@@ -136,6 +138,22 @@ def render(request: Request, template: str, ctx: Optional[dict] = None):
     }
     base.update(ctx or {})
     return templates.TemplateResponse(request, template, base)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Friendly HTML 404 for browser requests; JSON for API/daemon clients.
+
+    A browser (Accept: text/html) gets the themed 404 page. Anything else (the
+    daemon, fetch/XHR, curl) keeps the plain JSON {"detail": ...} so clients are
+    not handed HTML. Non-404 errors keep the default JSON shape too."""
+    accepts_html = "text/html" in request.headers.get("accept", "")
+    if exc.status_code == 404 and accepts_html:
+        resp = render(request, "404.html", {})
+        resp.status_code = 404
+        return resp
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
+                        headers=getattr(exc, "headers", None))
 
 
 @app.get("/set-lang/{lang}")
