@@ -125,6 +125,17 @@
     <img class="screenshot" src="{{ shot }}" alt="Schermata di {{ app.name }}">
     {% endfor %}
   </section>
+  {% elif hds_screenshots %}
+  {# The cichéto ships no screenshots of its own, so we show the ones that
+     already exist on HaikuDepotServer (proxied + cached). Additive, not
+     re-hosted: credited to their source below. #}
+  <section class="screenshots">
+    <h2>{{ t('app.screenshots') }}</h2>
+    {% for code in hds_screenshots %}
+    <img class="screenshot" src="/screenshot/{{ code }}" alt="Schermata di {{ app.name }}" loading="lazy">
+    {% endfor %}
+    <p class="hint">{{ t('app.screenshots_hds') }}</p>
+  </section>
   {% endif %}
 </article>
 

@@ -13,6 +13,7 @@ daemon this is a wishlist; with it, it's remote install.
 """
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -38,7 +39,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
-from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads, version
+from . import config, hds, hpkr, hvif, i18n, ombra, repo_proxy, uploads, version
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
@@ -1216,8 +1217,14 @@ def app_page(request: Request, cicheto_id: str,
     # already have cached; we do NOT resolve ombra live here (would be slow) and
     # we do NOT pick a winner. The user chooses.
     also_in = _also_in_sources(session, row)
+    # Screenshots: the cichéto's own take priority; if it has none, offer the
+    # ones that already exist on HaikuDepotServer (proxied + cached). Best-effort:
+    # HDS unreachable -> empty list -> the section is simply omitted.
+    hds_screenshots = ([] if app_data.get("screenshots")
+                       else _hds_screenshot_codes(row))
     return render(request, "app.html",
-                  {"app": app_data, "repo_base": repo_base, "also_in": also_in})
+                  {"app": app_data, "repo_base": repo_base, "also_in": also_in,
+                   "hds_screenshots": hds_screenshots})
 
 
 @app.get("/get-spritz", response_class=HTMLResponse)
@@ -1455,6 +1462,75 @@ def placeholder(name: str = Query("?")):
     svg = ph.placeholder_svg(name, size=64)
     return Response(svg, media_type="image/svg+xml",
                     headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ---------- screenshots (proxied from HaikuDepotServer, cached) ----------
+
+# Per-process cache of screenshot code lists, keyed by HDS package name, so one
+# page render (and repeat visits) makes at most one HDS list call per app.
+_HDS_CODES_CACHE: dict = {}
+
+
+def _hds_pkg_name(row: CichetoRow) -> Optional[str]:
+    """The HaikuDepotServer package name to query for screenshots. Prefer an
+    explicit bridge to HaikuPorts; else the last path segment of the reverse-dns
+    id (org.haiku.genio -> genio), which matches how the mirror ids are built."""
+    bridge = (row.raw.get("bridge") or {}) if isinstance(row.raw, dict) else {}
+    if bridge.get("haikuports"):
+        return str(bridge["haikuports"])
+    # repo.haikuports.<name> or org.x.<name> -> <name>
+    tail = row.id.rsplit(".", 1)[-1]
+    return tail or None
+
+
+def _hds_screenshot_codes(row: CichetoRow) -> list[str]:
+    """Screenshot codes for this app from HaikuDepotServer, cached. Empty when the
+    cichéto already has its own screenshots (we do not override the author) or
+    when HDS has none / is unreachable."""
+    if (row.raw or {}).get("screenshots"):
+        return []                      # author's own screenshots win; skip HDS
+    pkg = _hds_pkg_name(row)
+    if not pkg:
+        return []
+    if pkg in _HDS_CODES_CACHE:
+        return _HDS_CODES_CACHE[pkg]
+    codes = [s["code"] for s in hds.list_screenshots(pkg)]
+    _HDS_CODES_CACHE[pkg] = codes
+    return codes
+
+
+@app.get("/screenshot/{code}")
+def screenshot(code: str):
+    """Proxy + cache a single HaikuDepotServer screenshot PNG. The image stays
+    HDS's; we cache it so the app page is fast and does not send the visitor's
+    browser to depot.haiku-os.org on every view. 404 if HDS has no such image."""
+    # code is an HDS GUID; reject anything that could escape the cache dir.
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", code):
+        raise HTTPException(400, "bad screenshot code")
+    cache = Path(config.UPLOAD_DIR) / "screenshots" / f"{code}.png"
+    if cache.is_file():
+        return FileResponse(cache, media_type="image/png")
+    png = hds.screenshot_bytes(code)
+    if png is None:
+        raise HTTPException(404, "screenshot not available")
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_bytes(png)
+    return FileResponse(cache, media_type="image/png")
+
+
+@app.get("/screenshots/{cicheto_id}")
+def screenshots_json(cicheto_id: str, session: Session = Depends(get_session)):
+    """The screenshot URLs spritz would show for an app: the cichéto's own if it
+    has them, otherwise the proxied HaikuDepotServer ones. JSON for the API."""
+    row = session.get(CichetoRow, cicheto_id)
+    if not row:
+        raise HTTPException(404, "Cichéto not found")
+    own = (row.raw or {}).get("screenshots") or []
+    if own:
+        return {"source": "cicheto", "screenshots": own}
+    codes = _hds_screenshot_codes(row)
+    return {"source": "haikudepotserver",
+            "screenshots": [f"/screenshot/{c}" for c in codes]}
 
 
 def _stable_repo_url_for(session: Session, row: CichetoRow) -> Optional[str]:
