@@ -236,5 +236,37 @@ finally:
     import app.config as _cfg
     (pathlib.Path(_cfg.UPLOAD_DIR) / "icons" / "repo.haikuports.gizmo.png").unlink(missing_ok=True)
 
+# --- negative icon cache: a miss is remembered, not re-attempted ---
+# seed a lone app with no twin and no extractable icon; /icon must 404 once,
+# then answer from the .none marker without calling _extract_icon again.
+import app.config as _cfg
+seed_cicheto("repo.lone.noicon", "noiconapp", "lote")
+_icons = pathlib.Path(_cfg.UPLOAD_DIR) / "icons"
+(_icons / "repo.lone.noicon.none").unlink(missing_ok=True)
+(_icons / "repo.lone.noicon.png").unlink(missing_ok=True)
+
+calls = {"n": 0}
+def _counting_extract(row):
+    calls["n"] += 1
+    return None                      # never yields an icon
+_orig_extract2 = main._extract_icon
+_orig_tool = main.hvif.tool_available
+main._extract_icon = _counting_extract
+main.hvif.tool_available = lambda: True   # pretend hvif2png is present
+try:
+    r1 = c.get("/icon/repo.lone.noicon")
+    assert r1.status_code == 404, r1.status_code
+    assert (_icons / "repo.lone.noicon.none").is_file(), "miss marker not written"
+    after_first = calls["n"]
+    assert after_first >= 1, "extract not attempted on first request"
+    r2 = c.get("/icon/repo.lone.noicon")
+    assert r2.status_code == 404, r2.status_code
+    assert calls["n"] == after_first, "extract re-attempted despite negative cache"
+    print("negative icon cache: miss remembered, not re-downloaded -> ok")
+finally:
+    main._extract_icon = _orig_extract2
+    main.hvif.tool_available = _orig_tool
+    (_icons / "repo.lone.noicon.none").unlink(missing_ok=True)
+
 pathlib.Path("test_downloads.db").unlink(missing_ok=True)
 print("\nPASS: download tracking + home shelves + dedup")

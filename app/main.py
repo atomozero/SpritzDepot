@@ -1375,9 +1375,17 @@ def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
     the frontend then shows its generated placeholder."""
     if "/" in cicheto_id or "\\" in cicheto_id:
         raise HTTPException(400, "bad id")
-    cache = Path(config.UPLOAD_DIR) / "icons" / f"{cicheto_id}.png"
+    icons_dir = Path(config.UPLOAD_DIR) / "icons"
+    cache = icons_dir / f"{cicheto_id}.png"
     if cache.is_file():
         return FileResponse(cache, media_type="image/png")
+    # Negative cache: extracting an icon means downloading the hpkg (seconds for
+    # a big library like ffmpeg) only to find it ships no HVIF. Once we know an
+    # app yields no icon, remember it so later requests 404 instantly instead of
+    # re-downloading every time. Cleared by wiping the icons dir on a re-ingest.
+    miss = icons_dir / f"{cicheto_id}.none"
+    if miss.is_file():
+        raise HTTPException(404, "no icon (cached miss)")
 
     if not hvif.tool_available():
         raise HTTPException(404, "icon extraction not configured")
@@ -1393,6 +1401,8 @@ def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
         # instead of the generated placeholder; still the author's own artwork.
         png = _borrow_twin_icon(session, row)
     if png is None:
+        icons_dir.mkdir(parents=True, exist_ok=True)
+        miss.write_bytes(b"")      # remember the miss; don't re-download next time
         raise HTTPException(404, "no icon available")
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_bytes(png)
