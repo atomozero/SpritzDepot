@@ -169,5 +169,46 @@ with Session(engine) as s:
 assert res3["newest_id"] is None, res3
 print("equal versions decline to pick a winner -> ok")
 
+
+# --- ombra copies join the compare (version resolved live, mocked here) ---
+def seed_ombra(cid, name, bacaro):
+    with Session(engine) as s:
+        s.merge(CichetoRow(
+            id=cid, name=name, summary=f"{name} summary", bacaro=bacaro,
+            channels="ombra",
+            raw={"id": cid, "name": name, "homepage": "https://github.com/o/x",
+                 "channels": {"ombra": {"kind": "hpkg", "source": "github-latest",
+                                        "repo": "o/x", "match": "x-*-{arch}.hpkg",
+                                        "artifacts": {"x86_64": {}}}}}))
+        s.commit()
+
+# an ombra app (no cached version) vs a pinned mirror copy
+seed_ombra("com.me.gizmo", "gizmo", "vepro")
+seed_cicheto("repo.haikuports.gizmo", "gizmo", "haikuports", version="1.0-1")
+
+# mock the live ombra lookup: the author's latest tag is newer (2.5)
+_orig_ombra = main._ombra_version
+main._ombra_version = lambda raw: "2.5" if (raw or {}).get("id") == "com.me.gizmo" else _orig_ombra(raw)
+main._OMBRA_VERSION_CACHE.clear()
+try:
+    with Session(engine) as s:
+        # viewing the mirror (1.0): the ombra copy (2.5) must win
+        res4 = main._also_in_sources(s, s.get(CichetoRow, "repo.haikuports.gizmo"))
+    assert res4["newest_id"] == "com.me.gizmo", res4
+    assert any(x["id"] == "com.me.gizmo" and x["newest"] for x in res4["sources"]), res4
+    print("ombra copy joins compare and can be the newest -> ok")
+
+    # if the live lookup fails (returns None), the ombra copy is skipped, not guessed
+    main._ombra_version = lambda raw: None
+    main._OMBRA_VERSION_CACHE.clear()
+    with Session(engine) as s:
+        res5 = main._also_in_sources(s, s.get(CichetoRow, "repo.haikuports.gizmo"))
+    # only the mirror has a version now -> it is the sole, and newest
+    assert res5["newest_id"] == "repo.haikuports.gizmo", res5
+    print("failed ombra lookup is skipped, not guessed -> ok")
+finally:
+    main._ombra_version = _orig_ombra
+    main._OMBRA_VERSION_CACHE.clear()
+
 pathlib.Path("test_downloads.db").unlink(missing_ok=True)
 print("\nPASS: download tracking + home shelves + dedup")

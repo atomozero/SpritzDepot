@@ -440,6 +440,54 @@ def _cached_version(raw: dict) -> Optional[str]:
     return None
 
 
+# Small per-process cache so one page render (and quick repeat visits) does not
+# hit GitHub twice for the same repo. Keyed by (repo, match, prerelease). We do
+# not expire it aggressively: an ombra version changing mid-session is rare and
+# a slightly stale 'latest' badge is harmless. Cleared on process restart.
+_OMBRA_VERSION_CACHE: dict = {}
+
+
+def _ombra_version(raw: dict) -> Optional[str]:
+    """Best-effort live version of an ombra (github-latest) channel: the tag of
+    the author's newest release, so an ombra copy can join the version compare.
+
+    Deliberately defensive: a short timeout, and ANY failure (network, rate
+    limit, no match, bad config) returns None so the app page still renders fast
+    and the compare simply skips this copy rather than blocking or guessing."""
+    channels = (raw or {}).get("channels") or {}
+    ch = channels.get("ombra") if isinstance(channels, dict) else None
+    if not isinstance(ch, dict):
+        return None
+    repo = ch.get("repo") or ombra.repo_from_homepage(raw.get("homepage"))
+    match = ch.get("match")
+    if not repo or not match:
+        return None
+    prerelease = bool(ch.get("prerelease", False))
+    ckey = (repo, match, prerelease)
+    if ckey in _OMBRA_VERSION_CACHE:
+        return _OMBRA_VERSION_CACHE[ckey]
+    version_str = None
+    try:
+        # Only the version (tag) is needed; ask for one arch so assets resolve,
+        # but tolerate no-asset releases (we still get the tag). Short timeout.
+        arches = list((ch.get("artifacts") or {}).keys()) or ["x86_64"]
+        with httpx.Client(timeout=4.0, follow_redirects=True) as client:
+            res = ombra.resolve_github_latest(repo, match, arches,
+                                              prerelease=prerelease, client=client)
+        version_str = res.version or None
+    except (ombra.OmbraError, httpx.HTTPError, Exception):
+        version_str = None            # never let a live lookup break the page
+    _OMBRA_VERSION_CACHE[ckey] = version_str
+    return version_str
+
+
+def _best_version(raw: dict) -> Optional[str]:
+    """The version to use for the 'latest' compare: the cached stable/pinned
+    version if present, otherwise the live ombra tag. Cached first because it is
+    free and authoritative for pinned channels; ombra is the live fallback."""
+    return _cached_version(raw) or _ombra_version(raw)
+
+
 def _also_in_sources(session: Session, row: CichetoRow) -> dict:
     """Same app (same dedup key) in other repos, with the latest-version pick.
 
@@ -454,17 +502,19 @@ def _also_in_sources(session: Session, row: CichetoRow) -> dict:
 
     others = session.exec(
         select(CichetoRow).where(CichetoRow.id != row.id)).all()
-    sources = []
-    for o in others:
-        if _dedup_key({"name": o.name}) == key:
-            sources.append({"id": o.id, "bacaro": o.bacaro,
-                            "version": _cached_version(o.raw), "newest": False})
-    if not sources:
+    twins = [o for o in others if _dedup_key({"name": o.name}) == key]
+    if not twins:
         return {"sources": [], "newest_id": None}
+
+    # Only now (a real duplicate exists) do we spend the live ombra lookups, and
+    # only for this small group, not the whole catalog. _best_version resolves an
+    # ombra tag when there is no cached pinned version.
+    sources = [{"id": o.id, "bacaro": o.bacaro,
+                "version": _best_version(o.raw), "newest": False} for o in twins]
 
     # Include this app in the pool so 'newest' is honest across all copies.
     pool = sources + [{"id": row.id, "bacaro": row.bacaro,
-                       "version": _cached_version(row.raw)}]
+                       "version": _best_version(row.raw)}]
     newest_id = _pick_newest([p for p in pool if p["version"]])
     for s in sources:
         s["newest"] = (s["id"] == newest_id)
