@@ -1208,7 +1208,7 @@ def app_page(request: Request, cicheto_id: str,
     row = session.get(CichetoRow, cicheto_id)
     if not row:
         raise HTTPException(404, "Cichéto not found")
-    app_data = row.raw
+    app_data = dict(row.raw)   # a copy: we may enrich the placeholder summary
     # If a built stable sub-repo exists, hand the page its public URL so the
     # fallback button can point HaikuDepot at it.
     repo_base = _stable_repo_url_for(session, row)
@@ -1222,9 +1222,20 @@ def app_page(request: Request, cicheto_id: str,
     # HDS unreachable -> empty list -> the section is simply omitted.
     hds_screenshots = ([] if app_data.get("screenshots")
                        else _hds_screenshot_codes(row))
+    # Description: the cichéto's own wins; else the curated, localized text from
+    # HaikuDepotServer. Also upgrade an auto-generated placeholder summary
+    # ("genio from HaikuPorts") to the real HDS one-liner ("The Haiku IDE").
+    hds_desc = None
+    if not app_data.get("description"):
+        desc = _hds_description(row, current_lang(request))
+        if desc:
+            hds_desc = desc.get("description")
+            if desc.get("summary") and _placeholder_summary(
+                    app_data.get("summary", ""), app_data.get("name", "")):
+                app_data["summary"] = desc["summary"]
     return render(request, "app.html",
                   {"app": app_data, "repo_base": repo_base, "also_in": also_in,
-                   "hds_screenshots": hds_screenshots})
+                   "hds_screenshots": hds_screenshots, "hds_desc": hds_desc})
 
 
 @app.get("/get-spritz", response_class=HTMLResponse)
@@ -1497,6 +1508,40 @@ def _hds_screenshot_codes(row: CichetoRow) -> list[str]:
     codes = [s["code"] for s in hds.list_screenshots(pkg)]
     _HDS_CODES_CACHE[pkg] = codes
     return codes
+
+
+# Per-process cache of HDS descriptions, keyed by (pkg name, language).
+_HDS_DESC_CACHE: dict = {}
+
+
+def _hds_description(row: CichetoRow, lang: str) -> Optional[dict]:
+    """Curated summary + description from HaikuDepotServer for an app whose
+    cichéto lacks its own, cached per (package, language). None when the cichéto
+    already has a real description, or HDS has none / is unreachable."""
+    raw = row.raw or {}
+    if raw.get("description"):
+        return None                    # author's own description wins
+    pkg = _hds_pkg_name(row)
+    if not pkg:
+        return None
+    # HDS uses ISO codes; our lang codes ('it','vec',...) mostly match, but the
+    # Venetian tag has no HDS translation, so fall back to English for it.
+    hds_lang = "en" if lang in ("vec",) else lang
+    ckey = (pkg, hds_lang)
+    if ckey in _HDS_DESC_CACHE:
+        return _HDS_DESC_CACHE[ckey]
+    desc = hds.get_description(pkg, lang=hds_lang)
+    _HDS_DESC_CACHE[ckey] = desc
+    return desc
+
+
+def _placeholder_summary(summary: str, name: str) -> bool:
+    """True if a summary is the auto-generated import placeholder (e.g.
+    'genio from HaikuPorts', 'x from the lote repository'), which we prefer to
+    replace with the real HDS one-liner."""
+    s = (summary or "").lower()
+    return (s.endswith("from haikuports")
+            or " from the " in s and s.endswith(" repository"))
 
 
 @app.get("/screenshot/{code}")

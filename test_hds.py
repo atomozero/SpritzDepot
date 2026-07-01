@@ -117,5 +117,51 @@ class DeadClient:
 assert hds.list_screenshots("genio", client=DeadClient()) == []
 print("HDS unreachable degrades to empty list -> ok")
 
+
+# --- get_description reads versions[0].summary/description ---
+class DescClient:
+    def __init__(self, versions): self.versions = versions; self.posted = None
+    def post(self, url, json=None):
+        self.posted = json
+        return FakeResp(200, {"error": None, "result": {"versions": self.versions}})
+
+dc = DescClient([{"summary": "The Haiku IDE",
+                  "description": "Genio is an IDE for Haiku."}])
+desc = hds.get_description("genio", lang="en", client=dc)
+assert desc == {"summary": "The Haiku IDE",
+                "description": "Genio is an IDE for Haiku."}, desc
+assert dc.posted["versionType"] == "ALL", "must use versionType ALL"
+assert dc.posted["naturalLanguageCode"] == "en", dc.posted
+print("get_description reads summary+description, sends ALL+lang -> ok")
+
+# empty versions -> None
+assert hds.get_description("x", client=DescClient([])) is None
+# both texts empty -> None (nothing worth showing)
+assert hds.get_description("x", client=DescClient([{"summary": "", "description": ""}])) is None
+print("get_description: empty -> None -> ok")
+
+# integration: cichéto with own description skips HDS; placeholder summary upgrades
+main._HDS_DESC_CACHE.clear()
+_orig_desc = hds.get_description
+hds.get_description = lambda pkg, lang="en", **k: ({"summary": "The Haiku IDE",
+    "description": "An IDE."} if pkg == "genio" else None)
+try:
+    with Session(engine) as s:
+        mirror = s.get(CichetoRow, "repo.haikuports.genio")  # no own description
+        d = main._hds_description(mirror, "it")
+        assert d and d["description"] == "An IDE.", d
+        own = s.get(CichetoRow, "org.haiku.genio")
+        own.raw = {**own.raw, "description": "author text"}
+        # an app WITH its own description must not consult HDS
+        assert main._hds_description(own, "it") is None
+    # placeholder detection
+    assert main._placeholder_summary("genio from HaikuPorts", "genio") is True
+    assert main._placeholder_summary("pe from the lote repository", "pe") is True
+    assert main._placeholder_summary("The Haiku IDE", "genio") is False
+    print("app helper: own description wins, placeholder summary detected -> ok")
+finally:
+    hds.get_description = _orig_desc
+    main._HDS_DESC_CACHE.clear()
+
 pathlib.Path("test_hds.db").unlink(missing_ok=True)
 print("\nPASS: HaikuDepotServer screenshot import")

@@ -24,6 +24,25 @@
   </div>
   {% endif %}
 
+  {% if app.description %}
+  <section class="app-info description">
+    <h2>{{ t('app.description') }}</h2>
+    {% for para in app.description.split('\n\n') %}
+    {% if para.strip() %}<p>{{ para }}</p>{% endif %}
+    {% endfor %}
+  </section>
+  {% elif hds_desc %}
+  {# No description in the cichéto: show the curated one from HaikuDepotServer,
+     credited. Additive, not claimed as ours. #}
+  <section class="app-info description">
+    <h2>{{ t('app.description') }}</h2>
+    {% for para in hds_desc.split('\n\n') %}
+    {% if para.strip() %}<p>{{ para }}</p>{% endif %}
+    {% endfor %}
+    <p class="hint">{{ t('app.description_hds') }}</p>
+  </section>
+  {% endif %}
+
   <section class="install">
     <h2>{{ t('app.install') }}</h2>
     {% for channel_name, ch in app.channels.items() %}

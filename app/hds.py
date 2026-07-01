@@ -72,6 +72,50 @@ def list_screenshots(pkg_name: str,
             own.close()
 
 
+def get_description(pkg_name: str, lang: str = "en",
+                    repository_source: str = "haikuports_x86_64",
+                    client: Optional[httpx.Client] = None) -> Optional[dict]:
+    """The curated, localized summary + description for a package from HDS, or
+    None if unavailable. Returns {'summary': str|None, 'description': str|None}.
+
+    Uses get-pkg with versionType ALL (the only value that returns the versions
+    array carrying the texts, verified live) and reads the newest version's
+    summary/description. Best-effort: any failure returns None so the caller
+    keeps whatever it already had."""
+    if not pkg_name:
+        return None
+    url = f"{BASE_URL}/__api/v2/pkg/get-pkg"
+    try:
+        netguard.guard_url(url)
+    except netguard.BlockedURLError:
+        return None
+    own = client or httpx.Client(timeout=6.0, follow_redirects=True)
+    try:
+        r = own.post(url, json={"name": pkg_name,
+                                "repositorySource": repository_source,
+                                "versionType": "ALL",
+                                "naturalLanguageCode": lang})
+        if r.status_code != 200:
+            return None
+        body = r.json()
+        if body.get("error"):
+            return None
+        versions = ((body.get("result") or {}).get("versions")) or []
+        if not versions:
+            return None
+        v = versions[0]        # API returns newest first
+        summary = (v.get("summary") or "").strip() or None
+        description = (v.get("description") or "").strip() or None
+        if not summary and not description:
+            return None
+        return {"summary": summary, "description": description}
+    except Exception:
+        return None
+    finally:
+        if client is None:
+            own.close()
+
+
 def screenshot_bytes(code: str, w: int = DEFAULT_W, h: int = DEFAULT_H,
                      client: Optional[httpx.Client] = None) -> Optional[bytes]:
     """Download one screenshot PNG (tw/th are required by HDS). Returns the bytes
