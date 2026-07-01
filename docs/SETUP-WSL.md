@@ -29,6 +29,22 @@ Run the end-to-end test (no network, in-process):
 python test_flow.py
 ```
 
+### Optional: a GitHub token for ombra
+
+The ombra channel (an app that follows its author's latest GitHub release) and
+the version compare on the app page both call the GitHub releases API. Anonymous
+calls are capped at 60/hour, which is easy to exhaust while crawling or browsing.
+Set a token (a personal one with no scopes is enough for public repos) to raise
+the cap to 5000/hour:
+
+```bash
+export SPRITZ_GITHUB_TOKEN=ghp_yourtoken   # optional; recommended in prod
+```
+
+Without it, spritz still works: an ombra lookup that hits the rate limit just
+omits that version rather than failing the page. See the full env-var table in
+`README.md`.
+
 ## 2. Build the Haiku host tools (`package`, `package_repo`)
 
 This gates the repo-proxy layer (`docs/tasks/01-repo-proxy.md`). The HPKR

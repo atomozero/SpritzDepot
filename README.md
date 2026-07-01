@@ -1,4 +1,4 @@
-# spritz registry — server (v0.1)
+# spritz registry: server (v0.1)
 
 Backend del catalogo/store per l'installazione di software su Haiku OS.
 Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
@@ -88,11 +88,14 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_REPO_CACHE` | `packages-cache` | Dir dove il repo-proxy scarica gli hpkg e genera i cataloghi. Fuori dal sorgente, gitignored. |
 | `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | URL pubblico annunciato in `repo.info`. Deve essere raggiungibile da HaikuDepot. |
 | `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
-| `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale per il crawler ombra (alza il rate limit dell'API release). |
+| `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale (uno personale a scope minimo basta). Alza il rate limit dell'API release da 60 a 5000 richieste/ora, usato sia dal crawler ombra sia dal confronto versioni nella pagina app (la copia ombra di un'app duplicata risolve la sua ultima release live). Senza token, sotto carico GitHub può rispondere 403 rate-limit e quella versione ombra viene semplicemente omessa dal confronto. Consigliato in `prod`. |
 | `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
 | `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | URL del database. In prod puntalo a Postgres (vedi `migrations/`). |
 | `SPRITZ_HVIF2PNG_BIN` | non impostata | Path al tool `hvif2png` di Haiku per estrarre le icone dagli hpkg (vedi `docs/SETUP-WSL.md`). Senza, `/icon` risponde 404 e il frontend usa il placeholder. |
 | `SPRITZ_MAX_HPKG_ICON_BYTES` | `104857600` (100MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
+| `SPRITZ_FEATURED_CICHETO` | `repo.haikuports.genio` | Id del cichéto messo in evidenza nella home. Se assente dal catalogo, la sezione viene omessa. |
+| `SPRITZ_BROWSE_HIDDEN_BACARI` | `haikuports` | Bàcari nascosti dalla vetrina/home (CSV). Restano cercabili e raggiungibili per link; la ricerca e i filtri espliciti li mostrano. Serve a non far dominare il mirror HaikuPorts la vetrina. |
+| `SPRITZ_BROWSE_HIDDEN_SUFFIXES` | `_devel,_debuginfo,_debug,_source,_sources,_doc,_docs,_dev` | Suffissi di sotto-pacchetto (build artifact) nascosti dalla vetrina (CSV, match su id e nome). Restano cercabili. |
 
 In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
 sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
@@ -156,10 +159,10 @@ sample-bacaro/   cichéto d'esempio (Genio)
 
 ## Prossimi passi (non in v1)
 
-1. **Demone Haiku** che consuma `/library/pending` — chiude il cerchio Play Store.
+1. **Demone Haiku** che consuma `/library/pending` (chiude il cerchio Play Store).
 2. **Crawler GitHub release** per i canali `ombra` (github-latest + pattern match).
-3. **Tier di fiducia, firma manifest, transparency log** — fuori dal cichéto,
-   asserzioni firmate dell'indice.
+3. **Tier di fiducia, firma manifest, transparency log** (fuori dal cichéto,
+   asserzioni firmate dell'indice).
 4. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
 5. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
 
