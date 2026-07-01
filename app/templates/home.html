@@ -59,6 +59,9 @@
   {% else %}
   <p class="hint"><a href="/categories">{{ t('home.browse_by_category') }}</a></p>
   {% endif %}
+  {% if curated_browse %}
+  <p class="curated-note">{{ t('home.curated_note') }}</p>
+  {% endif %}
   {% if results %}
   <ul class="app-list">
     {% for app in results %}{{ app_card(app) }}{% endfor %}

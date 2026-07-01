@@ -71,6 +71,17 @@ HVIF2PNG_BIN = os.environ.get("SPRITZ_HVIF2PNG_BIN")
 MAX_HPKG_FETCH_FOR_ICON = int(
     os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(100 * 1024 * 1024)))  # 100 MB
 
+# Bàcari that are "everything HaikuDepot already shows" (a mirror of HaikuPorts).
+# They stay in the catalog and are fully searchable, but the browse/home view
+# hides them so the shop-window highlights the third-party sources that are
+# spritz's actual value (the apps HaikuDepot does NOT show). Comma-separated
+# slugs. A blank search + no filters excludes these; a query or an explicit
+# category/bàcaro filter includes them.
+BROWSE_HIDDEN_BACARI = [
+    b.strip() for b in os.environ.get("SPRITZ_BROWSE_HIDDEN_BACARI", "haikuports")
+    .split(",") if b.strip()
+]
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.

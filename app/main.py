@@ -332,8 +332,11 @@ PAGE_SIZE = 24
 MAX_PAGE_SIZE = 100
 
 
-def _search_query(q: str, category: str, bacaro: str):
-    """Build the filtered select (no limit/offset)."""
+def _search_query(q: str, category: str, bacaro: str,
+                  exclude_hidden: bool = False):
+    """Build the filtered select (no limit/offset). When exclude_hidden is set,
+    drop the browse-hidden bàcari (the HaikuPorts mirror) so the shop-window
+    highlights third-party sources; search and explicit filters keep everything."""
     stmt = select(CichetoRow)
     if q:
         like = f"%{q}%"
@@ -350,6 +353,8 @@ def _search_query(q: str, category: str, bacaro: str):
         )
     if bacaro:
         stmt = stmt.where(CichetoRow.bacaro == bacaro)
+    if exclude_hidden and config.BROWSE_HIDDEN_BACARI:
+        stmt = stmt.where(CichetoRow.bacaro.not_in(config.BROWSE_HIDDEN_BACARI))
     return stmt
 
 
@@ -364,10 +369,10 @@ def _row_dict(r: CichetoRow) -> dict:
 
 def _search_rows(session: Session, q: str = "", category: str = "",
                  bacaro: str = "", limit: int = PAGE_SIZE,
-                 offset: int = 0) -> tuple[list[dict], int]:
+                 offset: int = 0, exclude_hidden: bool = False) -> tuple[list[dict], int]:
     """Filtered, paginated search. Returns (rows, total). Shared by the JSON API
     and the HTML home."""
-    base = _search_query(q, category, bacaro)
+    base = _search_query(q, category, bacaro, exclude_hidden)
     total = len(session.exec(base).all())
     rows = session.exec(base.order_by(CichetoRow.name)
                         .offset(offset).limit(limit)).all()
@@ -892,15 +897,21 @@ def repo_package(vendor: str, arch: str, filename: str):
 def home(request: Request, q: str = Query(""), category: str = Query(""),
          bacaro: str = Query(""), page: int = Query(1, ge=1),
          session: Session = Depends(get_session)):
-    """Catalog home + search, optionally filtered by category or bàcaro."""
+    """Catalog home + search, optionally filtered by category or bàcaro.
+
+    Pure browse (no query, no filters) hides the browse-hidden bàcari (the
+    HaikuPorts mirror) to highlight third-party sources; a search or an explicit
+    filter shows everything, so nothing is unreachable."""
     offset = (page - 1) * PAGE_SIZE
+    is_browse = not (q or category or bacaro)
     results, total = _search_rows(session, q, category, bacaro,
-                                  limit=PAGE_SIZE, offset=offset)
+                                  limit=PAGE_SIZE, offset=offset,
+                                  exclude_hidden=is_browse)
     pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
     return render(
         request, "home.html",
         {"q": q, "category": category, "bacaro": bacaro, "results": results,
-         "total": total, "page": page, "pages": pages}
+         "total": total, "page": page, "pages": pages, "curated_browse": is_browse}
     )
 
 
