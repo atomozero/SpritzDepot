@@ -1384,16 +1384,56 @@ def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
     row = session.get(CichetoRow, cicheto_id)
     if not row:
         raise HTTPException(404, "Cichéto not found")
-    url = _hpkg_url_for_icon(row)
-    if not url:
-        raise HTTPException(404, "no hpkg to extract an icon from")
-    try:
-        png = hvif.icon_png_from_hpkg_url(url, size=64)
-    except hvif.IconError as e:
-        raise HTTPException(404, f"no icon: {e}")
+
+    png = _extract_icon(row)
+    if png is None:
+        # Fall back to a twin copy of the same app in another repo that DOES have
+        # an extractable icon (e.g. the sample cichéto has a placeholder URL, but
+        # the HaikuPorts copy ships the real hpkg). The user sees the real icon
+        # instead of the generated placeholder; still the author's own artwork.
+        png = _borrow_twin_icon(session, row)
+    if png is None:
+        raise HTTPException(404, "no icon available")
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_bytes(png)
     return FileResponse(cache, media_type="image/png")
+
+
+def _extract_icon(row: CichetoRow) -> Optional[bytes]:
+    """Extract this cichéto's own icon PNG from its hpkg, or None if there is no
+    hpkg to pull from or the extraction fails."""
+    url = _hpkg_url_for_icon(row)
+    if not url:
+        return None
+    try:
+        return hvif.icon_png_from_hpkg_url(url, size=64)
+    except hvif.IconError:
+        return None
+
+
+def _borrow_twin_icon(session: Session, row: CichetoRow) -> Optional[bytes]:
+    """Icon of a twin copy (same dedup key, different id) that has an extractable
+    one. Prefers a cached PNG; else tries to extract, best-ranked source first.
+    Returns the PNG bytes, or None if no twin yields an icon."""
+    key = _dedup_key({"name": row.name})
+    if not key:
+        return None
+    twins = [o for o in session.exec(
+                 select(CichetoRow).where(CichetoRow.id != row.id)).all()
+             if _dedup_key({"name": o.name}) == key]
+    # Try the source closest to the author first (rank ascending).
+    twins.sort(key=lambda o: _bacaro_rank(o.bacaro))
+    for twin in twins:
+        cached = Path(config.UPLOAD_DIR) / "icons" / f"{twin.id}.png"
+        if cached.is_file():
+            return cached.read_bytes()
+        png = _extract_icon(twin)
+        if png is not None:
+            # Cache under the twin's id too, so its own page is fast next time.
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            cached.write_bytes(png)
+            return png
+    return None
 
 
 @app.get("/placeholder.svg")

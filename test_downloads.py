@@ -210,5 +210,31 @@ finally:
     main._ombra_version = _orig_ombra
     main._OMBRA_VERSION_CACHE.clear()
 
+
+# --- icon fallback: an app with no icon of its own borrows a twin's ---
+# gizmo (com.me.gizmo) has no extractable icon; its haikuports twin does.
+_orig_extract = main._extract_icon
+def _fake_extract(row):
+    # only the haikuports twin yields an icon; the ombra copy does not
+    return b"PNGDATA" if row.id == "repo.haikuports.gizmo" else None
+main._extract_icon = _fake_extract
+try:
+    with Session(engine) as s:
+        ombra_row = s.get(CichetoRow, "com.me.gizmo")
+        assert main._extract_icon(ombra_row) is None, "gizmo should have no own icon"
+        borrowed = main._borrow_twin_icon(s, ombra_row)
+    assert borrowed == b"PNGDATA", f"did not borrow twin icon: {borrowed!r}"
+    # and a twin with no icon anywhere borrows nothing
+    with Session(engine) as s:
+        lone = s.get(CichetoRow, "repo.lote.blender")  # blender has a haikuports twin too
+        # blender twin also returns None from _fake_extract -> nothing to borrow
+        assert main._borrow_twin_icon(s, lone) is None
+    print("icon fallback borrows a twin's icon, none when no twin has one -> ok")
+finally:
+    main._extract_icon = _orig_extract
+    # the borrow path caches the fake PNG under the twin's id; clean it up
+    import app.config as _cfg
+    (pathlib.Path(_cfg.UPLOAD_DIR) / "icons" / "repo.haikuports.gizmo.png").unlink(missing_ok=True)
+
 pathlib.Path("test_downloads.db").unlink(missing_ok=True)
 print("\nPASS: download tracking + home shelves + dedup")
