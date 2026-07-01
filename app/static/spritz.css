@@ -215,10 +215,23 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 /* ---------- App detail ---------- */
 .app-detail { background: #ffffff; border: 1px solid #e4e9f1; border-radius: 14px;
   padding: 24px 26px; margin-top: 24px; box-shadow: 0 2px 8px rgba(15,23,42,0.05); }
-.app-detail-head { display: flex; align-items: center; }
+.app-detail-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .app-detail-head .app-icon { margin-right: 16px; border-radius: 16px;
-  box-shadow: 0 2px 6px rgba(15,23,42,0.18); }
+  box-shadow: 0 2px 6px rgba(15,23,42,0.18); flex-shrink: 0; }
 .app-detail-head h1 { margin: 0; font-size: 27px; color: #0f172a; }
+.app-detail-titles { flex: 1 1 260px; }
+.app-detail-titles .app-summary { color: #5b6b80; font-size: 16px; margin: 4px 0 8px; }
+.app-detail-meta { margin-top: 2px; }
+.app-detail-meta .badge { margin: 2px 5px 2px 0; }
+/* primary action sits at the right of the header, wraps under on narrow widths */
+.app-detail-cta { margin-left: auto; text-align: right; flex-shrink: 0; }
+.app-detail-cta .btn { margin: 0; }
+.app-detail-cta .hint { display: block; margin-top: 6px; }
+
+/* screenshots as a horizontal strip that scrolls, not a tall stack */
+.screenshot-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.screenshot-strip .screenshot { height: 260px; width: auto; max-width: none; margin: 0;
+  flex: 0 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; }
 
 .bridge-note {
   background: #ecfdf5; border: 1px solid #a7f3d0; border-left: 4px solid #10b981;

@@ -4,6 +4,8 @@
 
 {% block content %}
 <article class="app-detail">
+
+  {# 1. Identity: icon, name, summary, primary action. What the app is, at a glance. #}
   <header class="app-detail-head">
     {% if app.icon %}
     <img class="app-icon" src="{{ app.icon }}" alt="" width="64" height="64">
@@ -11,9 +13,28 @@
     <img class="app-icon" width="64" height="64" alt="" src="/icon/{{ app.id }}"
          onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
     {% endif %}
-    <div>
+    <div class="app-detail-titles">
       <h1>{{ app.name }}</h1>
       <p class="app-summary">{{ app.summary }}</p>
+      <div class="app-detail-meta">
+        <a class="badge badge-bacaro" href="/?bacaro={{ app.bacaro|urlencode }}">bacaro: {{ app.bacaro }}</a>
+        {% for cat in app.categories %}
+        <a class="badge badge-category" href="/?category={{ cat|urlencode }}">{{ cat }}</a>
+        {% endfor %}
+        {% if app.bridge and app.bridge.haikuports %}
+        <span class="badge badge-bridge">{{ t('badge.also_on_hp') }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {# Primary action, next to the name like a store. JS swaps to a spritz:// deep
+       link when the native client answers. #}
+    <div class="app-detail-cta"
+         id="library-box" data-cicheto="{{ app.id }}"
+         data-msg-login="{{ t('lib.login_first') }}"
+         data-msg-added="{{ t('lib.added') }}"
+         data-msg-error="{{ t('lib.error') }}">
+      <button id="lib-add" class="btn">{{ t('lib.add') }}</button>
+      <span class="hint" id="lib-status"></span>
     </div>
   </header>
 
@@ -24,6 +45,30 @@
   </div>
   {% endif %}
 
+  {# 2. Screenshots: the visual shop-window, high up. Own ones win; otherwise the
+     credited HaikuDepotServer ones. #}
+  {% if app.screenshots %}
+  <section class="screenshots">
+    <h2>{{ t('app.screenshots') }}</h2>
+    <div class="screenshot-strip">
+      {% for shot in app.screenshots %}
+      <img class="screenshot" src="{{ shot }}" alt="Schermata di {{ app.name }}" loading="lazy">
+      {% endfor %}
+    </div>
+  </section>
+  {% elif hds_screenshots %}
+  <section class="screenshots">
+    <h2>{{ t('app.screenshots') }}</h2>
+    <div class="screenshot-strip">
+      {% for code in hds_screenshots %}
+      <img class="screenshot" src="/screenshot/{{ code }}" alt="Schermata di {{ app.name }}" loading="lazy">
+      {% endfor %}
+    </div>
+    <p class="hint">{{ t('app.screenshots_hds') }}</p>
+  </section>
+  {% endif %}
+
+  {# 3. Description: what it does. Own wins; else the credited HDS text. #}
   {% if app.description %}
   <section class="app-info description">
     <h2>{{ t('app.description') }}</h2>
@@ -32,8 +77,6 @@
     {% endfor %}
   </section>
   {% elif hds_desc %}
-  {# No description in the cichéto: show the curated one from HaikuDepotServer,
-     credited. Additive, not claimed as ours. #}
   <section class="app-info description">
     <h2>{{ t('app.description') }}</h2>
     {% for para in hds_desc.split('\n\n') %}
@@ -43,6 +86,7 @@
   </section>
   {% endif %}
 
+  {# 4. Install: the technical detail, after the user knows they want it. #}
   <section class="install">
     <h2>{{ t('app.install') }}</h2>
     {% for channel_name, ch in app.channels.items() %}
@@ -52,9 +96,6 @@
         {{ t('app.channel') }} {{ channel_name }}
         {% if ch.version %}<span class="version">v{{ ch.version }}</span>{% endif %}
       </h3>
-
-      <!-- Default (no native client): the fallback. JS upgrades this to a
-           spritz:// deep link if the local client answers. -->
       <div class="install-actions">
         {% if ch.source == 'haikuports' %}
         <p class="hint">{{ t('app.from_haikuports') }}</p>
@@ -62,8 +103,7 @@
         <p><code>pkgman install {{ app.bridge.haikuports }}</code></p>
         {% endif %}
         {% elif channel_name == 'stable' and repo_base %}
-        <a class="btn btn-fallback"
-           href="{{ repo_base }}">{{ t('app.add_repo') }}</a>
+        <a class="btn btn-fallback" href="{{ repo_base }}">{{ t('app.add_repo') }}</a>
         <p class="hint">
           Copia questo URL in HaikuDepot (Repository), poi installa {{ app.name }}
           come qualsiasi altro pacchetto. Nessun client aggiuntivo richiesto.
@@ -89,32 +129,7 @@
     {% endfor %}
   </section>
 
-  <section class="install" id="library-box" data-cicheto="{{ app.id }}"
-           data-msg-login="{{ t('lib.login_first') }}"
-           data-msg-added="{{ t('lib.added') }}"
-           data-msg-error="{{ t('lib.error') }}">
-    <button id="lib-add" class="btn">{{ t('lib.add') }}</button>
-    <span class="hint" id="lib-status"></span>
-  </section>
-
-  <section class="app-info">
-    {% if app.author %}
-    <p><strong>{{ t('app.author') }}:</strong> {{ app.author.name }}
-      {% if app.author.contact %}
-      (<a href="{{ app.author.contact }}">{{ app.author.contact }}</a>)
-      {% endif %}
-    </p>
-    {% endif %}
-    {% if app.packager %}
-    <p><strong>{{ t('app.packager') }}:</strong> {{ app.packager.name }}
-      (bacaro {{ app.packager.bacaro }})</p>
-    {% endif %}
-    {% if app.homepage %}
-    <p><strong>{{ t('app.site') }}:</strong> <a href="{{ app.homepage }}">{{ app.homepage }}</a></p>
-    {% endif %}
-    {% if app.license %}<p><strong>{{ t('app.license') }}:</strong> {{ app.license }}</p>{% endif %}
-  </section>
-
+  {# 5. Same app in other repositories, with the newest one flagged. #}
   {% if also_in.sources %}
   <section class="app-info also-in">
     <h2>{{ t('app.also_in') }}</h2>
@@ -137,25 +152,26 @@
   </section>
   {% endif %}
 
-  {% if app.screenshots %}
-  <section class="screenshots">
-    <h2>{{ t('app.screenshots') }}</h2>
-    {% for shot in app.screenshots %}
-    <img class="screenshot" src="{{ shot }}" alt="Schermata di {{ app.name }}">
-    {% endfor %}
-  </section>
-  {% elif hds_screenshots %}
-  {# The cichéto ships no screenshots of its own, so we show the ones that
-     already exist on HaikuDepotServer (proxied + cached). Additive, not
-     re-hosted: credited to their source below. #}
-  <section class="screenshots">
-    <h2>{{ t('app.screenshots') }}</h2>
-    {% for code in hds_screenshots %}
-    <img class="screenshot" src="/screenshot/{{ code }}" alt="Schermata di {{ app.name }}" loading="lazy">
-    {% endfor %}
-    <p class="hint">{{ t('app.screenshots_hds') }}</p>
+  {# 6. Technical details last: author, packager, site, license. #}
+  {% if app.author or app.packager or app.homepage or app.license %}
+  <section class="app-info details">
+    <h2>{{ t('app.details') }}</h2>
+    {% if app.author %}
+    <p><strong>{{ t('app.author') }}:</strong> {{ app.author.name }}
+      {% if app.author.contact %}(<a href="{{ app.author.contact }}">{{ app.author.contact }}</a>){% endif %}
+    </p>
+    {% endif %}
+    {% if app.packager %}
+    <p><strong>{{ t('app.packager') }}:</strong> {{ app.packager.name }}
+      (bacaro {{ app.packager.bacaro }})</p>
+    {% endif %}
+    {% if app.homepage %}
+    <p><strong>{{ t('app.site') }}:</strong> <a href="{{ app.homepage }}">{{ app.homepage }}</a></p>
+    {% endif %}
+    {% if app.license %}<p><strong>{{ t('app.license') }}:</strong> {{ app.license }}</p>{% endif %}
   </section>
   {% endif %}
+
 </article>
 
 <script src="/static/install-button.js"></script>

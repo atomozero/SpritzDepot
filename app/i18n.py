@@ -69,6 +69,7 @@ STRINGS: dict[str, dict[str, str]] = {
     'app.packager': {"it": 'Packager', "es": 'Empaquetador', "de": 'Packager', "zh": '打包者', "nl": 'Packager', "fr": 'Empaqueteur', "ja": 'パッケージャ', "vec": 'Inpachetador'},
     'app.site': {"it": 'Sito', "es": 'Sitio', "de": 'Webseite', "zh": '网站', "nl": 'Site', "fr": 'Site', "ja": 'サイト', "vec": 'Sito'},
     'app.license': {"it": 'Licenza', "es": 'Licencia', "de": 'Lizenz', "zh": '许可证', "nl": 'Licentie', "fr": 'Licence', "ja": 'ライセンス', "vec": 'Licensa'},
+    'app.details': {"it": 'Dettagli', "es": 'Detalles', "de": 'Details', "zh": '详情', "nl": 'Details', "fr": 'Détails', "ja": '詳細', "vec": 'Detai'},
     'app.screenshots': {"it": 'Schermate', "es": 'Capturas', "de": 'Screenshots', "zh": '截图', "nl": 'Schermafbeeldingen', "fr": "Captures d'écran", "ja": 'スクリーンショット', "vec": 'Schermade'},
     'app.screenshots_hds': {"it": 'Schermate da HaikuDepotServer.', "es": 'Capturas de HaikuDepotServer.', "de": 'Screenshots von HaikuDepotServer.', "zh": '截图来自 HaikuDepotServer。', "nl": 'Schermafbeeldingen van HaikuDepotServer.', "fr": "Captures d'écran depuis HaikuDepotServer.", "ja": 'スクリーンショットは HaikuDepotServer より。', "vec": "Schermade da HaikuDepotServer."},
     'app.description': {"it": 'Descrizione', "es": 'Descripción', "de": 'Beschreibung', "zh": '描述', "nl": 'Beschrijving', "fr": 'Description', "ja": '説明', "vec": 'Descrission'},
