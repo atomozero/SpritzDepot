@@ -60,6 +60,24 @@ class Bacaro(SQLModel, table=True):
     last_error: Optional[str] = None
 
 
+class DownloadEvent(SQLModel, table=True):
+    """One append-only row per resolved download, so the catalog can show a real
+    'most downloaded this month' chart instead of a fabricated one.
+
+    Recorded when the daemon resolves an app for install (/resolve) and again,
+    more strongly, when it confirms the install landed (/library/{id}/installed).
+    `kind` distinguishes the two so we can weight or filter later. Kept lean and
+    append-only; the ranking is a GROUP BY over a time window."""
+    __tablename__ = "downloads"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    cicheto_id: str = Field(index=True)
+    channel: str = "stable"
+    arch: Optional[str] = None
+    kind: str = Field(default="resolve", index=True)  # 'resolve' | 'installed'
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class InstallState(SQLModel, table=True):
     """A user's library entry: the 'Play Store' queue.
 

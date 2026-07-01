@@ -35,6 +35,15 @@
 </li>
 {% endmacro %}
 
+{% macro app_icon(app, cls) %}
+  {% if app.icon %}
+  <img class="{{ cls }}" src="{{ app.icon }}" alt="">
+  {% else %}
+  <img class="{{ cls }}" src="/icon/{{ app.id }}" alt=""
+       onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <section class="hero">
   <h1>{{ t('home.hero_title') }}</h1>
@@ -46,11 +55,62 @@
   </form>
 </section>
 
+{% if featured %}
+<section class="featured">
+  <h2 class="shelf-title">{{ t('home.featured') }}</h2>
+  <a class="featured-card" href="/app/{{ featured.id }}">
+    {{ app_icon(featured, 'featured-icon') }}
+    <span class="featured-body">
+      <span class="featured-name">{{ featured.name }}</span>
+      <span class="featured-summary">{{ featured.summary }}</span>
+      <span class="featured-meta">
+        <span class="badge badge-bacaro">bacaro: {{ featured.bacaro }}</span>
+        {% for ch in featured.channels %}<span class="badge badge-channel">{{ ch }}</span>{% endfor %}
+      </span>
+    </span>
+    <span class="btn featured-cta">{{ t('home.featured_cta') }}</span>
+  </a>
+</section>
+{% endif %}
+
+{% if top_downloads %}
+<section class="results">
+  <h2 class="shelf-title">{{ t('home.top_month') }}</h2>
+  <ul class="app-list">
+    {% for app in top_downloads %}
+    <li class="app-card">
+      <a class="app-link app-link-row" href="/app/{{ app.id }}">
+        {{ app_icon(app, 'app-icon-sm') }}
+        <span class="app-link-text">
+          <span class="app-name">{{ loop.index }}. {{ app.name }}</span>
+          <span class="app-summary">{{ app.summary }}</span>
+        </span>
+      </a>
+      <div class="app-meta">
+        <span class="badge badge-downloads" title="{{ t('home.downloads_title') }}">
+          &#8595; {{ app.downloads }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if random_apps %}
+<section class="results">
+  <h2 class="shelf-title">{{ t('home.from_repos') }}</h2>
+  <ul class="app-list">
+    {% for app in random_apps %}{{ app_card(app) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="results">
   <h2>
     {% if q %}{{ t('home.results_for') }} "{{ q }}"
     {% elif category %}{{ t('nav.categories') }}: {{ category }}
     {% elif bacaro %}bacaro: {{ bacaro }}
+    {% elif featured or top_downloads or random_apps %}{{ t('home.all_catalog') }}
     {% else %}{{ t('home.browse') }}{% endif %}
   </h2>
   {% if q or category or bacaro %}

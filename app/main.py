@@ -14,7 +14,7 @@ daemon this is a wishlist; with it, it's remote install.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +30,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field as PField
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -46,7 +46,7 @@ from jose import JWTError, jwt
 from .config import check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_directory, ingest_git, list_bacari
-from .models import Bacaro, CichetoRow, InstallState, User
+from .models import Bacaro, CichetoRow, DownloadEvent, InstallState, User
 from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
@@ -379,6 +379,61 @@ def _search_rows(session: Session, q: str = "", category: str = "",
     return [_row_dict(r) for r in rows], total
 
 
+def _rows_by_ids(session: Session, ids: list[str]) -> list[dict]:
+    """Fetch cichéti for a list of ids, preserving the given order (so a ranking
+    stays ranked). Missing ids (pruned since the event) are skipped."""
+    if not ids:
+        return []
+    found = {r.id: r for r in
+             session.exec(select(CichetoRow).where(CichetoRow.id.in_(ids))).all()}
+    return [_row_dict(found[i]) for i in ids if i in found]
+
+
+def _top_downloads(session: Session, since_days: int = 30,
+                   limit: int = 8) -> list[dict]:
+    """Real 'most downloaded' ranking over the last `since_days`. Groups the
+    append-only DownloadEvent log by app and orders by count. Portable SQL
+    (GROUP BY + count), so it works on SQLite and Postgres alike. Empty until
+    real downloads accrue; the caller hides the section when so."""
+    since = datetime.utcnow() - timedelta(days=since_days)
+    stmt = (select(DownloadEvent.cicheto_id,
+                   func.count(DownloadEvent.id).label("n"))
+            .where(DownloadEvent.created_at >= since)
+            .group_by(DownloadEvent.cicheto_id)
+            .order_by(func.count(DownloadEvent.id).desc())
+            .limit(limit))
+    ranked = session.exec(stmt).all()
+    counts = {cid: n for cid, n in ranked}
+    rows = _rows_by_ids(session, [cid for cid, _ in ranked])
+    for r in rows:
+        r["downloads"] = counts.get(r["id"], 0)
+    return rows
+
+
+def _random_third_party(session: Session, limit: int = 8,
+                        exclude: Optional[set] = None) -> list[dict]:
+    """A random sample of third-party apps (the browse-visible bàcari, i.e. not
+    the HaikuPorts mirror), to fill the 'from the repositories' shelf. Uses the
+    DB's random() so it varies per request; portable across SQLite/Postgres."""
+    stmt = select(CichetoRow)
+    if config.BROWSE_HIDDEN_BACARI:
+        stmt = stmt.where(CichetoRow.bacaro.not_in(config.BROWSE_HIDDEN_BACARI))
+    if exclude:
+        stmt = stmt.where(CichetoRow.id.not_in(list(exclude)))
+    stmt = stmt.order_by(func.random()).limit(limit)
+    return [_row_dict(r) for r in session.exec(stmt).all()]
+
+
+def _featured(session: Session) -> Optional[dict]:
+    """The single highlighted app for the hero shelf. Configurable via
+    SPRITZ_FEATURED_CICHETO; falls back to none if that id is absent."""
+    fid = config.FEATURED_CICHETO
+    if not fid:
+        return None
+    row = session.get(CichetoRow, fid)
+    return _row_dict(row) if row else None
+
+
 @app.get("/search")
 def search(q: str = Query("", description="free-text query"),
            category: str = Query(""), bacaro: str = Query(""),
@@ -415,6 +470,18 @@ def get_cicheto(cicheto_id: str, session: Session = Depends(get_session)):
 
 
 # ---------- daemon-facing resolve ----------
+
+def _record_download(session: Session, cicheto_id: str, channel: str,
+                     arch: Optional[str], kind: str) -> None:
+    """Append a download event. Best-effort: a failure here must never break the
+    resolve/install path, so we swallow errors and roll back."""
+    try:
+        session.add(DownloadEvent(cicheto_id=cicheto_id, channel=channel,
+                                  arch=arch, kind=kind))
+        session.commit()
+    except Exception:  # pragma: no cover - telemetry must not break installs
+        session.rollback()
+
 
 @app.get("/resolve/{cicheto_id}")
 def resolve(cicheto_id: str,
@@ -478,6 +545,8 @@ def resolve(cicheto_id: str,
     }
     if notes:
         out["notes"] = notes
+    # Count this as a download signal: the daemon calls resolve at install time.
+    _record_download(session, row.id, channel, arch, "resolve")
     return out
 
 
@@ -634,6 +703,8 @@ def mark_installed(cicheto_id: str,
     row.updated_at = datetime.utcnow()
     session.add(row)
     session.commit()
+    # Strong download signal: the install actually landed on a machine.
+    _record_download(session, cicheto_id, row.channel, row.arch, "installed")
     return {"status": "installed", "cicheto": cicheto_id}
 
 
@@ -908,11 +979,25 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
                                   limit=PAGE_SIZE, offset=offset,
                                   exclude_hidden=is_browse)
     pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
-    return render(
-        request, "home.html",
-        {"q": q, "category": category, "bacaro": bacaro, "results": results,
-         "total": total, "page": page, "pages": pages, "curated_browse": is_browse}
-    )
+    ctx = {"q": q, "category": category, "bacaro": bacaro, "results": results,
+           "total": total, "page": page, "pages": pages,
+           "curated_browse": is_browse}
+    # The shelves (featured app, random from the repos, most-downloaded chart)
+    # only make sense on the first page of a pure browse, not during a search or
+    # while paging deeper. Featured/random are excluded from the plain grid below
+    # so nothing shows twice.
+    if is_browse and page == 1:
+        featured = _featured(session)
+        top = _top_downloads(session, since_days=30, limit=8)
+        shown = {featured["id"]} if featured else set()
+        shown.update(r["id"] for r in top)
+        random_apps = _random_third_party(session, limit=8, exclude=shown)
+        ctx.update({"featured": featured, "top_downloads": top,
+                    "random_apps": random_apps,
+                    "grid_exclude": shown | {r["id"] for r in random_apps}})
+        # Keep the main grid free of the apps already surfaced in the shelves.
+        ctx["results"] = [r for r in results if r["id"] not in ctx["grid_exclude"]]
+    return render(request, "home.html", ctx)
 
 
 @app.get("/categories", response_class=HTMLResponse, include_in_schema=False)

@@ -82,6 +82,11 @@ BROWSE_HIDDEN_BACARI = [
     .split(",") if b.strip()
 ]
 
+# The cichéto id highlighted in the home hero ("featured app"). Any id in the
+# catalog; if it is absent the hero shelf is simply omitted. Default: Genio.
+FEATURED_CICHETO = os.environ.get("SPRITZ_FEATURED_CICHETO",
+                                  "repo.haikuports.genio").strip() or None
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.
