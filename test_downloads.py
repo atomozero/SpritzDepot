@@ -30,13 +30,13 @@ import app.main as main
 init_db()
 
 
-def seed_cicheto(cid, name, bacaro, channels="stable"):
+def seed_cicheto(cid, name, bacaro, channels="stable", version="1.0"):
     with Session(engine) as s:
         s.merge(CichetoRow(
             id=cid, name=name, summary=f"{name} summary", bacaro=bacaro,
             channels=channels,
             raw={"id": cid, "name": name,
-                 "channels": {"stable": {"kind": "hpkg", "version": "1.0",
+                 "channels": {"stable": {"kind": "hpkg", "version": version,
                                          "artifacts": {"x86_64": {"url": "https://x/a.hpkg",
                                                                   "sha256": "0"*64}}}}},
         ))
@@ -140,13 +140,34 @@ assert g["also_in"], "yab group has no also_in"
 assert {s2["bacaro"] for s2 in g["also_in"]} | {g["bacaro"]} >= {"fatelk", "otherrepo"}
 print("browse dedup collapses same app, keeps sources -> ok")
 
-# app page: also_in reaches the HaikuPorts mirror copy even though browse hides it
-seed_cicheto("repo.haikuports.blender", "Blender", "haikuports")
+# app page: also_in reaches the HaikuPorts mirror copy even though browse hides it,
+# and picks the newest version across copies (the real httrack -4 < -5 case).
+seed_cicheto("repo.lote.httrack", "httrack", "lote", version="3.49.2-4")
+seed_cicheto("repo.haikuports.httrack", "httrack", "haikuports", version="3.49.2-5")
 with Session(engine) as s:
-    row = s.get(CichetoRow, "repo.lote.blender")
-    srcs = main._also_in_sources(s, row)
-assert any(x["id"] == "repo.haikuports.blender" for x in srcs), srcs
-print("app-page also_in reaches the hidden mirror copy -> ok")
+    lote = s.get(CichetoRow, "repo.lote.httrack")
+    res = main._also_in_sources(s, lote)
+# viewing the lote copy: the haikuports copy (-5) is newer
+assert res["newest_id"] == "repo.haikuports.httrack", res
+assert any(x["id"] == "repo.haikuports.httrack" and x["newest"]
+           for x in res["sources"]), res
+print("app-page also_in picks newest version across repos -> ok")
+
+# viewing the newer copy: it is flagged as the latest, no 'newer elsewhere'
+with Session(engine) as s:
+    hp = s.get(CichetoRow, "repo.haikuports.httrack")
+    res2 = main._also_in_sources(s, hp)
+assert res2["newest_id"] == "repo.haikuports.httrack", res2
+assert not any(x["newest"] for x in res2["sources"]), res2  # the other (lote) is older
+print("app-page marks the viewed copy as latest when it is -> ok")
+
+# equal versions -> no winner (decline rather than pick arbitrarily)
+seed_cicheto("repo.a.tie", "tieapp", "lote", version="2.0-1")
+seed_cicheto("repo.b.tie", "tieapp", "fatelk", version="2.0-1")
+with Session(engine) as s:
+    res3 = main._also_in_sources(s, s.get(CichetoRow, "repo.a.tie"))
+assert res3["newest_id"] is None, res3
+print("equal versions decline to pick a winner -> ok")
 
 pathlib.Path("test_downloads.db").unlink(missing_ok=True)
 print("\nPASS: download tracking + home shelves + dedup")

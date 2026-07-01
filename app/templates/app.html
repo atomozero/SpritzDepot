@@ -96,16 +96,22 @@
     {% if app.license %}<p><strong>{{ t('app.license') }}:</strong> {{ app.license }}</p>{% endif %}
   </section>
 
-  {% if also_in %}
+  {% if also_in.sources %}
   <section class="app-info also-in">
     <h2>{{ t('app.also_in') }}</h2>
     <p class="hint">{{ t('app.also_in_hint') }}</p>
+    {% if also_in.newest_id and also_in.newest_id != app.id %}
+    <p class="latest-note">{{ t('app.latest_elsewhere') }}</p>
+    {% elif also_in.newest_id == app.id %}
+    <p class="latest-note latest-here">{{ t('app.latest_here') }}</p>
+    {% endif %}
     <ul class="source-list">
-      {% for src in also_in %}
+      {% for src in also_in.sources %}
       <li>
         <a href="/app/{{ src.id }}">{{ src.id }}</a>
         <span class="badge badge-bacaro">bacaro: {{ src.bacaro }}</span>
         {% if src.version %}<span class="badge badge-channel">v{{ src.version }}</span>{% endif %}
+        {% if src.newest %}<span class="badge badge-newest">{{ t('app.newest') }}</span>{% endif %}
       </li>
       {% endfor %}
     </ul>

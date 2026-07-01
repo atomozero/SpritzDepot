@@ -38,7 +38,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
-from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads
+from . import config, hpkr, hvif, i18n, ombra, repo_proxy, uploads, version
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
@@ -440,21 +440,56 @@ def _cached_version(raw: dict) -> Optional[str]:
     return None
 
 
-def _also_in_sources(session: Session, row: CichetoRow) -> list[dict]:
-    """Other cichéti that are the same app (same dedup key) in a different repo.
-    Returns [{id, bacaro, version}], version best-effort from the cache."""
+def _also_in_sources(session: Session, row: CichetoRow) -> dict:
+    """Same app (same dedup key) in other repos, with the latest-version pick.
+
+    Returns {sources: [{id, bacaro, version, newest}], newest_id}. `newest` marks
+    the source with the highest Haiku version among all copies (this app plus the
+    others); `newest_id` is that id, or None when versions cannot be compared
+    (unknown/ombra/unparseable) so the UI does not assert a false 'latest'. No
+    live resolve: versions are best-effort from the cache."""
     key = _dedup_key({"name": row.name})
     if not key:
-        return []
+        return {"sources": [], "newest_id": None}
+
     others = session.exec(
         select(CichetoRow).where(CichetoRow.id != row.id)).all()
-    out = []
+    sources = []
     for o in others:
         if _dedup_key({"name": o.name}) == key:
-            out.append({"id": o.id, "bacaro": o.bacaro,
-                        "version": _cached_version(o.raw)})
-    out.sort(key=lambda s: _bacaro_rank(s["bacaro"]))
-    return out
+            sources.append({"id": o.id, "bacaro": o.bacaro,
+                            "version": _cached_version(o.raw), "newest": False})
+    if not sources:
+        return {"sources": [], "newest_id": None}
+
+    # Include this app in the pool so 'newest' is honest across all copies.
+    pool = sources + [{"id": row.id, "bacaro": row.bacaro,
+                       "version": _cached_version(row.raw)}]
+    newest_id = _pick_newest([p for p in pool if p["version"]])
+    for s in sources:
+        s["newest"] = (s["id"] == newest_id)
+    sources.sort(key=lambda s: _bacaro_rank(s["bacaro"]))
+    return {"sources": sources, "newest_id": newest_id}
+
+
+def _pick_newest(pool: list[dict]) -> Optional[str]:
+    """Return the id of the highest-version entry in `pool` (each {id, version}),
+    or None if a strict order cannot be established (a version fails to parse, or
+    the top two tie and so no single 'latest' exists). Refusing to pick beats
+    picking wrong."""
+    if not pool:
+        return None
+    best = pool[0]
+    tie = False
+    for cand in pool[1:]:
+        c = version.compare_versions(cand["version"], best["version"])
+        if c is None:
+            return None            # cannot compare: decline to pick a winner
+        if c > 0:
+            best, tie = cand, False
+        elif c == 0:
+            tie = True
+    return None if tie else best["id"]
 
 
 def _search_rows(session: Session, q: str = "", category: str = "",
