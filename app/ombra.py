@@ -128,7 +128,11 @@ def resolve_github_latest(repo: str, match: str, arches: list,
         raise OmbraError(
             f"no suitable release for {repo} (prerelease={prerelease})")
 
-    version = rel.get("tag_name") or rel.get("name")
+    version = rel.get("tag_name") or rel.get("name") or ""
+    # Tags often carry a leading "v" (v1.2.0); strip it so the UI, which
+    # prefixes "v" itself, does not show "vv1.2.0".
+    if version[:1] in ("v", "V") and version[1:2].isdigit():
+        version = version[1:]
     artifacts = _match_assets(rel.get("assets", []), match, arches)
     result = OmbraResult(repo=repo, version=version, artifacts=artifacts)
     if not artifacts:

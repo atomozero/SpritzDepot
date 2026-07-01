@@ -1,0 +1,20 @@
+cicheto: 1
+id: com.atomozero.sestriere
+name: Sestriere
+summary: Client MeshCore nativo per Haiku
+homepage: https://github.com/atomozero/Sestriere
+categories:
+  - network
+  - radio
+author:
+  name: atomozero
+  contact: https://github.com/atomozero
+packager:
+  name: atomozero
+  bacaro: vepro
+channels:
+  ombra:
+    kind: zip
+    source: github-latest
+    repo: atomozero/Sestriere
+    match: "Sestriere-*-haiku.zip"

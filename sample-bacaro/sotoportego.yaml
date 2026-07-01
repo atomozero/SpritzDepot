@@ -1,0 +1,20 @@
+cicheto: 1
+id: com.atomozero.sotoportego
+name: Sotoportego
+summary: Client VPN nativo per Haiku (OpenVPN)
+homepage: https://github.com/atomozero/Sotoportego
+categories:
+  - network
+  - internet
+author:
+  name: atomozero
+  contact: https://github.com/atomozero
+packager:
+  name: atomozero
+  bacaro: vepro
+channels:
+  ombra:
+    kind: zip
+    source: github-latest
+    repo: atomozero/Sotoportego
+    match: "Sotoportego-*-{arch}.zip"

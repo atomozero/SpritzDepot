@@ -66,16 +66,16 @@ print("repo_from_homepage -> ok")
 res = ombra.resolve_github_latest(
     "owner/genio", "genio-*-{arch}.hpkg", ["x86_64", "x86_gcc2h"],
     prerelease=False, client=FakeClient(RELEASES))
-assert res.version == "v1.5", res.version
+assert res.version == "1.5", res.version
 assert res.artifacts["x86_64"] == "https://x/genio-1.5-x86_64.hpkg"
 assert res.artifacts["x86_gcc2h"] == "https://x/genio-1.5-x86_gcc2h.hpkg"
-print("latest stable      -> ok (v1.5, both arches matched)")
+print("latest stable      -> ok (1.5, both arches matched)")
 
 # --- prerelease allowed: picks the rc, only x86_64 asset present ---
 res2 = ombra.resolve_github_latest(
     "owner/genio", "genio-*-{arch}.hpkg", ["x86_64", "x86_gcc2h"],
     prerelease=True, client=FakeClient(RELEASES))
-assert res2.version == "v2.0-rc1", res2.version
+assert res2.version == "2.0-rc1", res2.version
 assert res2.artifacts.get("x86_64") == "https://x/rc.hpkg"
 assert "x86_gcc2h" not in res2.artifacts  # no matching asset in the rc
 print("prerelease         -> ok (rc picked, missing arch absent)")
@@ -132,7 +132,7 @@ try:
     r = c.get("/resolve/org.haiku.genio?channel=ombra&arch=x86_64")
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["version"] == "v1.5", body
+    assert body["version"] == "1.5", body
     art = body["artifacts"]["x86_64"]
     assert art["url"] == "https://x/genio-1.5-x86_64.hpkg", art
     assert "sha256" not in art, "ombra must not carry a pre-computed sha256"
@@ -150,7 +150,7 @@ try:
     items = pend.json()
     assert len(items) == 1, items
     it = items[0]
-    assert it["channel"] == "ombra" and it["version"] == "v1.5", it
+    assert it["channel"] == "ombra" and it["version"] == "1.5", it
     assert it["artifacts"]["x86_64"]["url"] == "https://x/genio-1.5-x86_64.hpkg", it
     assert "sha256" not in it["artifacts"]["x86_64"], "ombra pending: no sha256"
     print("/library/pending   -> ok (ombra resolved live in the poll)")
