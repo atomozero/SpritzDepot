@@ -96,6 +96,22 @@
     {% if app.license %}<p><strong>{{ t('app.license') }}:</strong> {{ app.license }}</p>{% endif %}
   </section>
 
+  {% if also_in %}
+  <section class="app-info also-in">
+    <h2>{{ t('app.also_in') }}</h2>
+    <p class="hint">{{ t('app.also_in_hint') }}</p>
+    <ul class="source-list">
+      {% for src in also_in %}
+      <li>
+        <a href="/app/{{ src.id }}">{{ src.id }}</a>
+        <span class="badge badge-bacaro">bacaro: {{ src.bacaro }}</span>
+        {% if src.version %}<span class="badge badge-channel">v{{ src.version }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
   {% if app.screenshots %}
   <section class="screenshots">
     <h2>{{ t('app.screenshots') }}</h2>

@@ -20,6 +20,10 @@
   <div class="app-meta">
     <a class="badge badge-bacaro" href="/?bacaro={{ app.bacaro|urlencode }}"
        title="Mostra le app di questo bacaro">bacaro: {{ app.bacaro }}</a>
+    {% if app.also_in %}
+    <span class="badge badge-multi"
+          title="{{ t('app.also_in') }}">{{ t('card.in_repos', n=app.also_in|length + 1) }}</span>
+    {% endif %}
     {% for ch in app.channels %}
     <span class="badge badge-channel">{{ ch }}</span>
     {% endfor %}

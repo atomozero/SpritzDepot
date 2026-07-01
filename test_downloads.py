@@ -125,5 +125,28 @@ assert "home.top_month" not in html and "home.from_repos" not in html, "raw i18n
 assert "badge-downloads" in html, "download badge missing"
 print("home renders featured + top + from-repos -> ok")
 
+# --- dedup: same app in two visible bàcari collapses to one card with also_in ---
+# Two visible copies of 'yab' (fatelk + otherrepo) exercise the browse grouping.
+seed_cicheto("repo.fatelk.yab", "yab", "fatelk")
+seed_cicheto("repo.other.yab", "yab", "otherrepo")   # a second visible source
+with Session(engine) as s:
+    browse, _ = main._search_rows(s, exclude_hidden=True, limit=200)
+    groups = main._dedup_groups(browse)
+yab_groups = [g for g in groups if main._dedup_key(g) == "yab"]
+assert len(yab_groups) == 1, f"yab not collapsed: {yab_groups}"
+g = yab_groups[0]
+# fatelk (rank 1) or otherrepo (rank 0) represents; the other is in also_in
+assert g["also_in"], "yab group has no also_in"
+assert {s2["bacaro"] for s2 in g["also_in"]} | {g["bacaro"]} >= {"fatelk", "otherrepo"}
+print("browse dedup collapses same app, keeps sources -> ok")
+
+# app page: also_in reaches the HaikuPorts mirror copy even though browse hides it
+seed_cicheto("repo.haikuports.blender", "Blender", "haikuports")
+with Session(engine) as s:
+    row = s.get(CichetoRow, "repo.lote.blender")
+    srcs = main._also_in_sources(s, row)
+assert any(x["id"] == "repo.haikuports.blender" for x in srcs), srcs
+print("app-page also_in reaches the hidden mirror copy -> ok")
+
 pathlib.Path("test_downloads.db").unlink(missing_ok=True)
-print("\nPASS: download tracking + home shelves")
+print("\nPASS: download tracking + home shelves + dedup")

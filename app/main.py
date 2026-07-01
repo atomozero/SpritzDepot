@@ -374,6 +374,89 @@ def _row_dict(r: CichetoRow) -> dict:
             "icon": (r.raw or {}).get("icon")}
 
 
+def _dedup_key(row: dict) -> str:
+    """The identity that makes two cichéti 'the same app in different repos':
+    the name, lowercased with - and _ folded together (so 'yab' from fatelk and
+    'yab' from haikuports collide, but 'yab' and 'yab_devel' do not)."""
+    return (row.get("name") or "").strip().lower().replace("-", "_")
+
+
+# Which bàcaro a grouped card should represent, low number = preferred. The
+# author's own tap / ombra wins over a third-party hpkr mirror, which wins over
+# the HaikuPorts bulk mirror. A card shows the source closest to the author; the
+# others are listed as "also available in".
+def _bacaro_rank(bacaro: str) -> int:
+    if bacaro in config.BROWSE_HIDDEN_BACARI:   # the HaikuPorts mirror
+        return 2
+    if bacaro in ("lote", "fatelk"):            # known third-party hpkr repos
+        return 1
+    return 0                                    # author taps (vepro, ...)
+
+
+def _dedup_groups(rows: list[dict]) -> list[dict]:
+    """Collapse same-app-different-repo rows into one representative card each,
+    preserving the input order of first appearance. The representative is the
+    highest-ranked source; the rest are attached as `also_in` (bàcaro + id) so
+    the UI can show 'also available in N repositories' and link each source. No
+    version comparison is done: we present the sources, the user chooses."""
+    groups: dict[str, dict] = {}
+    order: list[str] = []
+    for row in rows:
+        key = _dedup_key(row)
+        g = groups.get(key)
+        if g is None:
+            groups[key] = {"rep": row, "sources": [row]}
+            order.append(key)
+        else:
+            g["sources"].append(row)
+            # keep the best-ranked row as the representative
+            if _bacaro_rank(row["bacaro"]) < _bacaro_rank(g["rep"]["bacaro"]):
+                g["rep"] = row
+    out: list[dict] = []
+    for key in order:
+        g = groups[key]
+        rep = dict(g["rep"])
+        others = [{"id": s["id"], "bacaro": s["bacaro"]}
+                  for s in g["sources"] if s["id"] != rep["id"]]
+        rep["also_in"] = others
+        out.append(rep)
+    return out
+
+
+def _cached_version(raw: dict) -> Optional[str]:
+    """A best-effort version string for a cichéto, read from the cache without
+    hitting the network. Prefers a stable channel's version, then any channel
+    that carries one. Returns None for ombra (resolved live) or when unknown, so
+    the UI can just omit the version rather than show a wrong or stale one."""
+    channels = (raw or {}).get("channels") or {}
+    if not isinstance(channels, dict):
+        return None
+    stable = channels.get("stable")
+    if isinstance(stable, dict) and stable.get("version"):
+        return str(stable["version"])
+    for ch in channels.values():
+        if isinstance(ch, dict) and ch.get("version"):
+            return str(ch["version"])
+    return None
+
+
+def _also_in_sources(session: Session, row: CichetoRow) -> list[dict]:
+    """Other cichéti that are the same app (same dedup key) in a different repo.
+    Returns [{id, bacaro, version}], version best-effort from the cache."""
+    key = _dedup_key({"name": row.name})
+    if not key:
+        return []
+    others = session.exec(
+        select(CichetoRow).where(CichetoRow.id != row.id)).all()
+    out = []
+    for o in others:
+        if _dedup_key({"name": o.name}) == key:
+            out.append({"id": o.id, "bacaro": o.bacaro,
+                        "version": _cached_version(o.raw)})
+    out.sort(key=lambda s: _bacaro_rank(s["bacaro"]))
+    return out
+
+
 def _search_rows(session: Session, q: str = "", category: str = "",
                  bacaro: str = "", limit: int = PAGE_SIZE,
                  offset: int = 0, exclude_hidden: bool = False) -> tuple[list[dict], int]:
@@ -985,10 +1068,24 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
     filter shows everything, so nothing is unreachable."""
     offset = (page - 1) * PAGE_SIZE
     is_browse = not (q or category or bacaro)
-    results, total = _search_rows(session, q, category, bacaro,
-                                  limit=PAGE_SIZE, offset=offset,
-                                  exclude_hidden=is_browse)
-    pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
+
+    if is_browse:
+        # Curated browse: fetch the whole (already small) third-party set, group
+        # same-app-different-repo copies into one card, then paginate the groups.
+        # Dedup must happen before paging or the counts break, and the curated
+        # set is tiny, so pulling it all is cheap.
+        all_rows, _ = _search_rows(session, exclude_hidden=True,
+                                   limit=100000, offset=0)
+        groups = _dedup_groups(all_rows)
+        total = len(groups)
+        pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        results = groups[offset:offset + PAGE_SIZE]
+    else:
+        results, total = _search_rows(session, q, category, bacaro,
+                                      limit=PAGE_SIZE, offset=offset,
+                                      exclude_hidden=False)
+        pages = (total + PAGE_SIZE - 1) // PAGE_SIZE
+
     ctx = {"q": q, "category": category, "bacaro": bacaro, "results": results,
            "total": total, "page": page, "pages": pages,
            "curated_browse": is_browse}
@@ -1001,7 +1098,8 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
         top = _top_downloads(session, since_days=30, limit=8)
         shown = {featured["id"]} if featured else set()
         shown.update(r["id"] for r in top)
-        random_apps = _random_third_party(session, limit=8, exclude=shown)
+        random_apps = _dedup_groups(_random_third_party(session, limit=24,
+                                                        exclude=shown))[:8]
         ctx.update({"featured": featured, "top_downloads": top,
                     "random_apps": random_apps,
                     "grid_exclude": shown | {r["id"] for r in random_apps}})
@@ -1028,7 +1126,13 @@ def app_page(request: Request, cicheto_id: str,
     # If a built stable sub-repo exists, hand the page its public URL so the
     # fallback button can point HaikuDepot at it.
     repo_base = _stable_repo_url_for(session, row)
-    return render(request, "app.html", {"app": app_data, "repo_base": repo_base})
+    # Same app in other repositories: match by the dedup key (normalized name),
+    # excluding this exact id. We present the sources with whatever version we
+    # already have cached; we do NOT resolve ombra live here (would be slow) and
+    # we do NOT pick a winner. The user chooses.
+    also_in = _also_in_sources(session, row)
+    return render(request, "app.html",
+                  {"app": app_data, "repo_base": repo_base, "also_in": also_in})
 
 
 @app.get("/get-spritz", response_class=HTMLResponse)
