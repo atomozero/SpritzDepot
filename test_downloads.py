@@ -48,6 +48,9 @@ seed_cicheto("org.haiku.genio", "Genio", "vepro")
 seed_cicheto("repo.lote.blender", "Blender", "lote")
 seed_cicheto("repo.fatelk.snowfall", "Snowfall", "fatelk")
 seed_cicheto("hp.mirror.zzz", "ZZZ", "haikuports")  # must never show in browse/random
+# build-artifact sub-packages: hidden from the shop-window, still searchable
+seed_cicheto("repo.lote.blender_devel", "blender_devel", "lote")
+seed_cicheto("repo.lote.ffmpeg_debuginfo", "ffmpeg_debuginfo", "lote")
 
 c = TestClient(main.app)
 
@@ -91,12 +94,27 @@ assert ids[1] == ("repo.fatelk.snowfall", 4), ids
 print("monthly ranking (30d window, ordered) -> ok")
 
 
-# --- random shelf excludes the HaikuPorts mirror ---
+# --- random shelf excludes the HaikuPorts mirror and build-artifact sub-packages ---
 with Session(engine) as s:
-    rnd = main._random_third_party(s, limit=8)
+    rnd = main._random_third_party(s, limit=20)
+ids = {r["id"] for r in rnd}
 assert all(r["bacaro"] != "haikuports" for r in rnd), rnd
-assert "hp.mirror.zzz" not in {r["id"] for r in rnd}
-print("random shelf excludes haikuports -> ok")
+assert "hp.mirror.zzz" not in ids
+assert "repo.lote.blender_devel" not in ids, "_devel leaked into shelf"
+assert "repo.lote.ffmpeg_debuginfo" not in ids, "_debuginfo leaked into shelf"
+print("random shelf excludes haikuports + sub-packages -> ok")
+
+
+# --- browse hides sub-packages, but search still finds them ---
+with Session(engine) as s:
+    browse, _ = main._search_rows(s, exclude_hidden=True, limit=200)
+    found, _ = main._search_rows(s, q="blender_devel", limit=10)
+bids = {r["id"] for r in browse}
+assert "repo.lote.blender_devel" not in bids, "_devel visible in browse"
+assert "repo.lote.ffmpeg_debuginfo" not in bids, "_debuginfo visible in browse"
+assert "repo.lote.blender" in bids, "real app wrongly hidden"
+assert any(r["id"] == "repo.lote.blender_devel" for r in found), "search cannot reach _devel"
+print("browse hides sub-packages, search still reaches them -> ok")
 
 
 # --- home renders all three shelves, no raw i18n keys, no double-listing ---

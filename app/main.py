@@ -353,8 +353,15 @@ def _search_query(q: str, category: str, bacaro: str,
         )
     if bacaro:
         stmt = stmt.where(CichetoRow.bacaro == bacaro)
-    if exclude_hidden and config.BROWSE_HIDDEN_BACARI:
-        stmt = stmt.where(CichetoRow.bacaro.not_in(config.BROWSE_HIDDEN_BACARI))
+    if exclude_hidden:
+        if config.BROWSE_HIDDEN_BACARI:
+            stmt = stmt.where(CichetoRow.bacaro.not_in(config.BROWSE_HIDDEN_BACARI))
+        # Hide build-artifact sub-packages (_devel/_debuginfo/_source/...) from
+        # the shop-window. A chain of NOT LIKE '%suffix' on both id and name;
+        # portable across SQLite and Postgres. '%' in a suffix is not expected.
+        for suf in config.BROWSE_HIDDEN_SUFFIXES:
+            stmt = stmt.where(~func.lower(CichetoRow.id).like(f"%{suf}"))
+            stmt = stmt.where(~func.lower(CichetoRow.name).like(f"%{suf}"))
     return stmt
 
 
@@ -418,6 +425,9 @@ def _random_third_party(session: Session, limit: int = 8,
     stmt = select(CichetoRow)
     if config.BROWSE_HIDDEN_BACARI:
         stmt = stmt.where(CichetoRow.bacaro.not_in(config.BROWSE_HIDDEN_BACARI))
+    for suf in config.BROWSE_HIDDEN_SUFFIXES:
+        stmt = stmt.where(~func.lower(CichetoRow.id).like(f"%{suf}"))
+        stmt = stmt.where(~func.lower(CichetoRow.name).like(f"%{suf}"))
     if exclude:
         stmt = stmt.where(CichetoRow.id.not_in(list(exclude)))
     stmt = stmt.order_by(func.random()).limit(limit)

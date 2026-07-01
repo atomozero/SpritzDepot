@@ -87,6 +87,19 @@ BROWSE_HIDDEN_BACARI = [
 FEATURED_CICHETO = os.environ.get("SPRITZ_FEATURED_CICHETO",
                                   "repo.haikuports.genio").strip() or None
 
+# Sub-package name suffixes that are build artifacts, not apps: -devel headers,
+# -debuginfo symbols, -source trees, -doc/-docs, and -source_debuginfo. The
+# browse/home view hides cichéti whose id or name ends in one of these (they
+# stay fully searchable and reachable by direct link), so the shop-window shows
+# real apps, not the _devel/_debuginfo noise a repo import pulls in.
+# Comma-separated, matched case-insensitively against the id and the name.
+BROWSE_HIDDEN_SUFFIXES = [
+    s.strip().lower() for s in os.environ.get(
+        "SPRITZ_BROWSE_HIDDEN_SUFFIXES",
+        "_devel,_debuginfo,_debug,_source,_sources,_doc,_docs,_dev",
+    ).split(",") if s.strip()
+]
+
 
 def check_prod_config() -> None:
     """Fail fast in production if security-critical secrets are missing.
