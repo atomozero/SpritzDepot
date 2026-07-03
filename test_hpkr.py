@@ -36,16 +36,23 @@ try:
 except hpkr.HpkrError:
     print("bad magic rejected -> ok")
 
-# resolve_from_repo with a fake HTTP client serving the fixture
-class FakeResp:
+# resolve_from_repo with a fake HTTP client serving the fixture. fetch_catalog
+# now streams (guarded + size-capped), so the fake exposes .stream() yielding a
+# context-managed response with iter_bytes.
+class _FakeStream:
     status_code = 200
-    content = blob
+    def __init__(self, data): self._data = data
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
     def raise_for_status(self): pass
+    def iter_bytes(self, n=65536):
+        for i in range(0, len(self._data), n):
+            yield self._data[i:i + n]
 
 class FakeClient:
-    def get(self, url, headers=None, params=None):
+    def stream(self, method, url, **k):
         assert url.endswith("/repo"), url
-        return FakeResp()
+        return _FakeStream(blob)
 
 urls = hpkr.resolve_from_repo("https://tap.example.org/repo", "helloapp",
                               client=FakeClient())
@@ -69,20 +76,33 @@ from fastapi.testclient import TestClient
 
 init_db()
 
-# Make the endpoint's httpx fetch return our fixture instead of hitting network.
-class _FakeStreamResp:
+# import-hpkr now fetches via netguard.fetch_guarded (guarded, no blind redirects).
+# Patch it to return our fixture instead of hitting the network.
+class _FakeBufResp:
     status_code = 200
     content = blob
     def raise_for_status(self): pass
-class _FakeHttpxClient:
-    def __init__(self, *a, **k): pass
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
-    def get(self, url, headers=None, params=None): return _FakeStreamResp()
-    def close(self): pass
 
-_orig_client = main.httpx.Client
-main.httpx.Client = _FakeHttpxClient
+def _fake_fetch_guarded(method, url, **k):
+    assert url.endswith("/repo"), url
+    return _FakeBufResp()
+
+import contextlib as _ctx
+
+@_ctx.contextmanager
+def _fake_stream_guarded(method, url, **k):
+    assert url.endswith("/repo"), url
+    yield _FakeStream(blob)
+
+_orig_fetch = main.netguard.fetch_guarded
+_orig_guard = main.netguard.guard_url
+_orig_stream = hpkr.netguard.stream_guarded
+main.netguard.fetch_guarded = _fake_fetch_guarded
+# The fixture host is fake; skip the real DNS/SSRF guard for this offline test.
+# (The guard itself is covered in test_security.) Also serve the live /resolve
+# fetch (resolve_from_repo -> fetch_catalog -> stream_guarded) from the fixture.
+main.netguard.guard_url = lambda url: None
+hpkr.netguard.stream_guarded = _fake_stream_guarded
 try:
     c = TestClient(main.app)
     ADMIN = {"X-Admin-Token": os.environ["SPRITZ_ADMIN_TOKEN"]}
@@ -120,6 +140,8 @@ try:
     assert art.get("url", "").endswith("/packages/helloapp-1.2.3-4-x86_64.hpkg"), pend
     print("pending hpkr-repo  -> ok (resolved live in the poll)")
 finally:
-    main.httpx.Client = _orig_client
+    main.netguard.fetch_guarded = _orig_fetch
+    main.netguard.guard_url = _orig_guard
+    hpkr.netguard.stream_guarded = _orig_stream
 
 print("\nPASS: HPKR parser + resolve_from_repo + import-hpkr")

@@ -39,7 +39,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
-from . import config, hds, hpkr, hvif, i18n, ombra, repo_proxy, uploads, version
+from . import config, hds, hpkr, hvif, i18n, netguard, ombra, repo_proxy, uploads, version
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)

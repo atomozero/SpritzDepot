@@ -166,7 +166,9 @@ def fetch_verified(url: str, sha256: Optional[str], dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
     try:
-        with httpx.stream("GET", url, follow_redirects=True, timeout=60.0) as r:
+        # stream_guarded re-validates every redirect hop (no blind follow to an
+        # internal host) and caps nothing itself, so we keep the byte cap below.
+        with netguard.stream_guarded("GET", url, timeout=60.0) as r:
             r.raise_for_status()
             written = 0
             with tmp.open("wb") as f:

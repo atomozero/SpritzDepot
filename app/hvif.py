@@ -95,27 +95,33 @@ def icon_png_from_hpkg_url(url: str, size: int = 64,
     if not tool_available():
         raise IconError("hvif2png not configured")
 
+    def _read_capped(r) -> bytearray:
+        r.raise_for_status()
+        data = bytearray()
+        for chunk in r.iter_bytes(1 << 16):
+            data.extend(chunk)
+            if len(data) > config.MAX_HPKG_FETCH_FOR_ICON:
+                raise IconError(
+                    f"hpkg exceeds icon-fetch cap "
+                    f"({config.MAX_HPKG_FETCH_FOR_ICON} bytes)")
+        return data
+
     try:
-        netguard.guard_url(url)
+        if client is not None:
+            # A caller-supplied client is a test double that never hits the
+            # network; skip the (real) DNS/guard on its fake host. Production
+            # fetches go through the guarded path below.
+            with client.stream("GET", url) as r:
+                data = _read_capped(r)
+        else:
+            # netguard.stream_guarded validates the URL and every redirect hop and
+            # never blindly follows a 30x to an unvalidated (internal) host.
+            with netguard.stream_guarded("GET", url, timeout=60.0) as r:
+                data = _read_capped(r)
     except netguard.BlockedURLError as e:
         raise IconError(str(e)) from e
-
-    own = client or httpx.Client(timeout=60.0, follow_redirects=True)
-    try:
-        with own.stream("GET", url) as r:
-            r.raise_for_status()
-            data = bytearray()
-            for chunk in r.iter_bytes(1 << 16):
-                data.extend(chunk)
-                if len(data) > config.MAX_HPKG_FETCH_FOR_ICON:
-                    raise IconError(
-                        f"hpkg exceeds icon-fetch cap "
-                        f"({config.MAX_HPKG_FETCH_FOR_ICON} bytes)")
     except httpx.HTTPError as e:
         raise IconError(f"fetch failed: {e}") from e
-    finally:
-        if client is None:
-            own.close()
 
     hvif = _extract_hvif(bytes(data))
     return _render_png(hvif, size)

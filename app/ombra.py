@@ -104,7 +104,7 @@ def resolve_github_latest(repo: str, match: str, arches: list,
     if not match:
         raise OmbraError("github-latest channel needs a 'match' pattern")
 
-    own = client or httpx.Client(timeout=20.0, follow_redirects=True)
+    own = client or httpx.Client(timeout=20.0, follow_redirects=False)
     try:
         r = own.get(f"{GITHUB_API}/repos/{repo}/releases",
                     headers=_gh_headers(), params={"per_page": 30})

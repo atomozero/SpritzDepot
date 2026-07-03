@@ -46,7 +46,7 @@ def list_screenshots(pkg_name: str,
         netguard.guard_url(url)
     except netguard.BlockedURLError:
         return []
-    own = client or httpx.Client(timeout=6.0, follow_redirects=True)
+    own = client or httpx.Client(timeout=6.0, follow_redirects=False)
     try:
         r = own.post(url, json={"pkgName": pkg_name})
         if r.status_code != 200:
@@ -89,7 +89,7 @@ def get_description(pkg_name: str, lang: str = "en",
         netguard.guard_url(url)
     except netguard.BlockedURLError:
         return None
-    own = client or httpx.Client(timeout=6.0, follow_redirects=True)
+    own = client or httpx.Client(timeout=6.0, follow_redirects=False)
     try:
         r = own.post(url, json={"name": pkg_name,
                                 "repositorySource": repository_source,
@@ -127,7 +127,7 @@ def screenshot_bytes(code: str, w: int = DEFAULT_W, h: int = DEFAULT_H,
         netguard.guard_url(url)
     except netguard.BlockedURLError:
         return None
-    own = client or httpx.Client(timeout=15.0, follow_redirects=True)
+    own = client or httpx.Client(timeout=15.0, follow_redirects=False)
     try:
         r = own.get(url, params={"tw": w, "th": h})
         if r.status_code != 200:

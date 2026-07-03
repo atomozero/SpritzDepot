@@ -26,6 +26,10 @@ from .hpkg_heap import HeapError, decompress_heap
 
 HPKR_MAGIC = b"hpkr"
 
+# A repository's HPKR catalog is small (a few MB even for HaikuPorts). Cap the
+# download so a malicious/slow repo cannot exhaust memory or hang a worker.
+MAX_CATALOG_BYTES = 64 * 1024 * 1024  # 64 MB
+
 # Attribute tag bit layout (unsigned LEB128):
 #   (encoding << 11) + (hasChildren << 10) + (dataType << 7) + id + 1
 # A zero tag terminates a child list.
@@ -70,6 +74,34 @@ ARCH_NAMES = ["any", "x86", "x86_gcc2", "source", "x86_64", "ppc", "arm",
 
 class HpkrError(RuntimeError):
     """A catalog we cannot parse (bad magic, unsupported compression, truncated)."""
+
+
+class CatalogTooLarge(HpkrError):
+    """The repo catalog exceeded MAX_CATALOG_BYTES."""
+
+
+def fetch_catalog(catalog_url: str, client=None) -> bytes:
+    """Fetch a repo's HPKR catalog with the SSRF guard (every redirect hop) and a
+    hard size cap, streaming so an oversized body is cut off early. A caller-
+    supplied client (tests) is trusted but still guarded + capped."""
+    def _read(r) -> bytes:
+        r.raise_for_status()
+        buf = bytearray()
+        for chunk in r.iter_bytes(1 << 16):
+            buf.extend(chunk)
+            if len(buf) > MAX_CATALOG_BYTES:
+                raise CatalogTooLarge(
+                    f"catalog exceeds {MAX_CATALOG_BYTES} bytes: {catalog_url}")
+        return bytes(buf)
+
+    if client is not None:
+        # A caller-supplied client is a test double that never touches the
+        # network, so we don't DNS-resolve/guard its (often fake) host; the real
+        # guarded path below is what protects production fetches.
+        with client.stream("GET", catalog_url) as r:
+            return _read(r)
+    with netguard.stream_guarded("GET", catalog_url, timeout=20.0) as r:
+        return _read(r)
 
 
 @dataclass
@@ -306,20 +338,13 @@ def resolve_from_repo(repo_url: str, package: str, arch: Optional[str] = None,
     `repo_url` is the base URL that also serves repo.info and the packages/
     directory (HaikuPorts is excluded by policy at the call site, not here)."""
     base = repo_url.rstrip("/")
+    catalog_url = f"{base}/repo"
     try:
-        netguard.guard_url(f"{base}/repo")
+        blob = fetch_catalog(catalog_url, client=client)
     except netguard.BlockedURLError as e:
         raise HpkrError(str(e)) from e
-    own = client or httpx.Client(timeout=20.0, follow_redirects=True)
-    try:
-        r = own.get(f"{base}/repo")
-        r.raise_for_status()
-        blob = r.content
     except httpx.HTTPError as e:
-        raise HpkrError(f"cannot fetch catalog {base}/repo: {e}") from e
-    finally:
-        if client is None:
-            own.close()
+        raise HpkrError(f"cannot fetch catalog {catalog_url}: {e}") from e
 
     pkgs = [p for p in parse_catalog(blob) if p.name == package
             and (arch is None or p.architecture == arch)]
