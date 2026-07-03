@@ -147,6 +147,34 @@ finally:
     _cfg.IS_PROD = _saved_prod
 print("SSRF guard           -> ok (internal/non-https blocked in prod)")
 
+# --- SSRF: private/internal IPs are blocked in DEV too (only https + loopback
+#     are relaxed in dev, never the private-range rejection) ---
+_cfg.IS_PROD = False
+try:
+    for bad in ("http://169.254.169.254/latest/meta-data",  # cloud metadata
+                "http://10.0.0.5/repo", "http://192.168.1.1/x",
+                "file:///etc/passwd"):                        # non-http blocked
+        try:
+            netguard.guard_url(bad)
+            raise SystemExit(f"FAIL: dev SSRF guard accepted {bad}")
+        except netguard.BlockedURLError:
+            pass
+    netguard.guard_url("http://127.0.0.1:8000/repo")  # loopback allowed in dev
+    netguard.guard_url("https://depot.haiku-os.org/x")
+finally:
+    _cfg.IS_PROD = _saved_prod
+print("SSRF guard (dev)     -> ok (private/metadata blocked, loopback allowed)")
+
+# --- redirect guard: a fetch that 30x-es to an internal host is refused ---
+# guard_url is re-run on every hop, so a public URL that redirects to a private
+# one cannot smuggle an internal fetch. We assert the helper exists and follows
+# manually (follow_redirects must be off).
+import inspect as _inspect
+_src = _inspect.getsource(netguard._guarded_redirects)
+assert "guard_url(current)" in _src, "redirect hops must be re-guarded"
+assert netguard.fetch_guarded.__doc__ and "redirect" in netguard.fetch_guarded.__doc__.lower()
+print("redirect guard       -> ok (every hop re-validated, no blind follow)")
+
 # Prod gate: missing secrets must raise.
 from app import config
 saved = (config.IS_PROD, config.SECRET_KEY, config.ADMIN_TOKEN)

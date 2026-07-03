@@ -996,13 +996,22 @@ def import_hpkr(request: Request, body: ImportHpkrBody,
         raise HTTPException(
             400, "refusing to import a HaikuPorts repo; use a bridge cichéto instead")
 
+    catalog_url = f"{base}/repo"
+    # SSRF guard: even an admin (or a stolen token) must not be able to make the
+    # server fetch internal services (cloud metadata, localhost, private ranges).
     try:
-        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-            r = client.get(f"{base}/repo")
-            r.raise_for_status()
-            packages = hpkr.parse_catalog(r.content)
-    except (httpx.HTTPError, hpkr.HpkrError) as e:
-        raise HTTPException(502, f"cannot read HPKR catalog at {base}/repo: {e}")
+        netguard.guard_url(catalog_url)
+    except netguard.BlockedURLError as e:
+        raise HTTPException(400, f"refusing to fetch that repo URL: {e}")
+
+    try:
+        # No blind redirect-following: a 30x could point Location: at an internal
+        # host that guard_url never saw. fetch_guarded re-validates each hop.
+        r = netguard.fetch_guarded("GET", catalog_url, timeout=30.0)
+        r.raise_for_status()
+        packages = hpkr.parse_catalog(r.content)
+    except (httpx.HTTPError, netguard.BlockedURLError, hpkr.HpkrError) as e:
+        raise HTTPException(502, f"cannot read HPKR catalog at {catalog_url}: {e}")
 
     if not packages:
         raise HTTPException(404, f"no packages in catalog at {base}/repo")
