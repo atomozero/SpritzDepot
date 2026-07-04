@@ -44,6 +44,11 @@ def _slug_lock(slug: str) -> threading.Lock:
 CLONE_TIMEOUT_SECONDS = 60
 MAX_REPO_BYTES = 50 * 1024 * 1024   # 50 MB of cichéti is already absurd
 MAX_FILE_COUNT = 5000
+# A single cichéto is a small YAML file. Cap per-file bytes BEFORE parsing so a
+# tiny-on-disk alias bomb (YAML anchors/aliases expand at parse time, so the
+# 50 MB repo cap doesn't catch it) can't OOM the ingest worker. 256 KB is plenty
+# for any real manifest.
+MAX_YAML_BYTES = 256 * 1024
 
 
 class IngestError(ValueError):
@@ -126,8 +131,24 @@ def _clone_or_pull(git_url: str, dest: Path) -> Path:
     return dest
 
 
+class _NoAliasLoader(yaml.SafeLoader):
+    """SafeLoader that refuses YAML aliases. safe_load blocks arbitrary object
+    construction but still expands anchors/aliases, which is the billion-laughs
+    amplification vector. A cichéto never needs aliases, so we reject them at
+    compose time (an '*ref' raises instead of expanding)."""
+    def compose_node(self, parent, index):
+        if self.check_event(yaml.events.AliasEvent):
+            raise yaml.YAMLError("YAML aliases are not allowed in a cichéto")
+        return super().compose_node(parent, index)
+
+
 def _parse_file(path: Path) -> Cicheto:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    # Cap bytes before parsing: an alias bomb is tiny on disk but explodes at
+    # parse time, so the repo-level size cap doesn't help.
+    raw = path.read_bytes()
+    if len(raw) > MAX_YAML_BYTES:
+        raise IngestError(f"cichéto file too large ({len(raw)} > {MAX_YAML_BYTES} bytes)")
+    data = yaml.load(raw.decode("utf-8"), Loader=_NoAliasLoader)
     return Cicheto.model_validate(data)
 
 
@@ -151,7 +172,11 @@ def _ingest_directory_locked(root: Path, bacaro_slug: str, prune: bool = True) -
     tap's slug and so cannot cause another tap's rows to be pruned or hijacked.
     """
     ok, failed = [], []
-    files = list(root.rglob("*.yaml")) + list(root.rglob("*.yml"))
+    # Skip symlinks: a bàcaro could ship a symlink (e.g. evil.yaml -> /etc/passwd)
+    # whose target lies outside the clone; reading it would pull host file content
+    # into the parse/error path. Only ingest regular files.
+    files = [f for f in (list(root.rglob("*.yaml")) + list(root.rglob("*.yml")))
+             if not f.is_symlink() and f.is_file()]
 
     with Session(engine) as session:
         for f in files:
