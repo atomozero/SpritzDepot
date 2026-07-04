@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import event
+from sqlalchemy import event, UniqueConstraint
 from sqlmodel import SQLModel, Field, Column, JSON
 
 
@@ -109,6 +109,11 @@ class InstallState(SQLModel, table=True):
            'removed'  -> user uninstalled
     """
     __tablename__ = "library"
+    # One library row per (user, app): the queue is upserted, not appended, so a
+    # double-click can't create two pending rows that then desync (the daemon
+    # installing twice, remove/installed only touching .first()).
+    __table_args__ = (UniqueConstraint("user_id", "cicheto_id",
+                                       name="uq_library_user_cicheto"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True, foreign_key="users.id")

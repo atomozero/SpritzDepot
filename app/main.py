@@ -32,6 +32,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, PlainTextResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field as PField
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, func
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -812,24 +813,38 @@ def queue_install(cicheto_id: str, body: QueueBody,
                   session: Session = Depends(get_session)):
     if not session.get(CichetoRow, cicheto_id):
         raise HTTPException(404, "Cichéto not found")
-    existing = session.exec(
-        select(InstallState).where(
-            InstallState.user_id == user.id,
-            InstallState.cicheto_id == cicheto_id,
-        )
-    ).first()
-    if existing:
+
+    def _find():
+        return session.exec(
+            select(InstallState).where(
+                InstallState.user_id == user.id,
+                InstallState.cicheto_id == cicheto_id,
+            )).first()
+
+    existing = _find()
+    if existing is None:
+        # Insert; a concurrent request that also saw no row will hit the unique
+        # constraint (uq_library_user_cicheto). Catch it and fall through to the
+        # update path so a double-click yields one row, not two.
+        session.add(InstallState(
+            user_id=user.id, cicheto_id=cicheto_id,
+            channel=body.channel, arch=body.arch, state="pending",
+        ))
+        try:
+            session.commit()
+            return {"status": "queued", "cicheto": cicheto_id,
+                    "channel": body.channel}
+        except IntegrityError:
+            session.rollback()
+            existing = _find()
+
+    if existing is not None:
         existing.state = "pending"
         existing.channel = body.channel
         existing.arch = body.arch
         existing.updated_at = datetime.utcnow()
         session.add(existing)
-    else:
-        session.add(InstallState(
-            user_id=user.id, cicheto_id=cicheto_id,
-            channel=body.channel, arch=body.arch, state="pending",
-        ))
-    session.commit()
+        session.commit()
     return {"status": "queued", "cicheto": cicheto_id, "channel": body.channel}
 
 
