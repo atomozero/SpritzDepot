@@ -33,6 +33,16 @@ SECRET_KEY = os.environ.get("SPRITZ_SECRET", _DEV_SECRET)
 # rather than falling back to a guessable value.
 ADMIN_TOKEN = os.environ.get("SPRITZ_ADMIN_TOKEN")
 
+# Whether the first user to register is auto-promoted to admin. Convenient in
+# dev, dangerous on a public prod deploy (a stranger who registers first would
+# own the admin routes), so it defaults ON in dev and OFF in prod. Force with
+# SPRITZ_BOOTSTRAP_ADMIN=1 / 0.
+_bootstrap_env = os.environ.get("SPRITZ_BOOTSTRAP_ADMIN")
+if _bootstrap_env is not None:
+    BOOTSTRAP_ADMIN = _bootstrap_env.strip().lower() in ("1", "true", "yes", "on")
+else:
+    BOOTSTRAP_ADMIN = ENV != "prod"
+
 # Path to Haiku's host-built `package_repo` tool (see docs/SETUP-WSL.md step 2).
 # If unset or not found, the repo-proxy layer reports 503 instead of crashing,
 # so the rest of the server runs fine without it.

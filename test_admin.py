@@ -7,6 +7,10 @@ from pathlib import Path
 os.environ.setdefault("SPRITZ_ENV", "dev")
 os.environ.setdefault("SPRITZ_SECRET", "x")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "test-admin-secret-123")
+# A throwaway DB so the "first user becomes admin" bootstrap is exercised on an
+# empty users table, and so we never touch the real catalog (spritz.db).
+os.environ["SPRITZ_DB_URL"] = "sqlite:///./test_admin.db"
+Path("test_admin.db").unlink(missing_ok=True)
 
 from app.db import init_db
 init_db()
@@ -86,3 +90,28 @@ assert c.get("/admin/bacari", headers=ADMIN).status_code == 200
 print("admin bootstrap    -> ok (first user admin, others not, token still works)")
 
 print("\nPASS: admin page + bàcaro records + delete + admin users")
+
+# --- bootstrap gating: with SPRITZ_BOOTSTRAP_ADMIN off, a fresh first user is
+#     NOT auto-admin (a public prod deploy must not hand admin to whoever
+#     registers first). Clear the users table and toggle the flag off. ---
+from app import config as _cfg
+from app.db import engine as _engine
+from app.models import User as _User
+from sqlmodel import Session as _Session, delete as _delete
+
+_saved = _cfg.BOOTSTRAP_ADMIN
+_cfg.BOOTSTRAP_ADMIN = False
+try:
+    with _Session(_engine) as _s:
+        _s.exec(_delete(_User))
+        _s.commit()
+    tok = c.post("/auth/register",
+                 json={"email": "first@x.io", "password": "longenough1"}).json()["access_token"]
+    r = c.get("/admin/bacari", headers={"Authorization": f"Bearer {tok}"})
+    assert r.status_code == 401, \
+        f"bootstrap-off: first user must not be admin, got {r.status_code}"
+    print("bootstrap gating   -> ok (off => first user not admin)")
+finally:
+    _cfg.BOOTSTRAP_ADMIN = _saved
+
+Path("test_admin.db").unlink(missing_ok=True)

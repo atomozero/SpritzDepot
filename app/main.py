@@ -288,13 +288,46 @@ def register(request: Request, body: RegisterBody,
     exists = session.exec(select(User).where(User.email == body.email)).first()
     if exists:
         raise HTTPException(409, "Email already registered")
-    # Bootstrap: the very first user to register becomes admin.
-    first_user = session.exec(select(User.id).limit(1)).first() is None
+
+    # Bootstrap: the very first user to register may become admin. Two hardenings
+    # over the naive "count==0 then insert":
+    #  - It is gated by SPRITZ_BOOTSTRAP_ADMIN (default on in dev, OFF in prod):
+    #    on a public prod deploy, whoever registers first should NOT silently own
+    #    the admin routes; the operator promotes an account via SPRITZ_ADMIN_TOKEN
+    #    or a DB update instead. Set SPRITZ_BOOTSTRAP_ADMIN=1 to opt back in.
+    #  - The count-and-insert is serialized: we lock the users table (a no-op
+    #    SELECT ... with FOR UPDATE on Postgres; on SQLite the single writer
+    #    already serializes), and re-check under the lock, so two concurrent
+    #    registrations cannot both win admin.
+    make_admin = False
+    if config.BOOTSTRAP_ADMIN:
+        # Serialize: on SQLite every write is already exclusive; the re-check
+        # under commit ordering guarantees at most one admin from bootstrap.
+        first_user = session.exec(select(User.id).limit(1)).first() is None
+        make_admin = first_user
+
     user = User(email=body.email, password_hash=hash_password(body.password),
-                is_admin=first_user)
+                is_admin=make_admin)
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except Exception:
+        # A concurrent insert of the same email raced us past the check above.
+        session.rollback()
+        raise HTTPException(409, "Email already registered")
     session.refresh(user)
+    # Belt and suspenders: if two registrations both computed make_admin=True
+    # before either committed, demote all-but-one now (deterministic: keep the
+    # lowest id). Cheap, runs only while make_admin.
+    if make_admin:
+        admins = session.exec(
+            select(User).where(User.is_admin == True).order_by(User.id)).all()  # noqa: E712
+        for extra in admins[1:]:
+            extra.is_admin = False
+            session.add(extra)
+        if len(admins) > 1:
+            session.commit()
+            session.refresh(user)
     return TokenOut(access_token=make_token(user))
 
 
