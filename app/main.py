@@ -13,6 +13,7 @@ daemon this is a wishlist; with it, it's remote install.
 """
 from __future__ import annotations
 
+import os
 import re
 import secrets
 from datetime import datetime, timedelta
@@ -34,6 +35,7 @@ from pydantic import BaseModel, EmailStr, Field as PField
 from sqlmodel import Session, select, func
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -51,8 +53,13 @@ from .models import Bacaro, CichetoRow, DownloadEvent, InstallState, User
 from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
-# Redis in prod for multi-process correctness.
-limiter = Limiter(key_func=get_remote_address)
+# Redis in prod for multi-process correctness (the in-memory store is per-process
+# and does not coordinate across workers). A generous default limit applies to
+# EVERY route so no public read endpoint is unbounded; routes that are cheaper or
+# costlier override it with their own @limiter.limit. Overridable via env for
+# load tuning.
+_DEFAULT_RATE = os.environ.get("SPRITZ_DEFAULT_RATE_LIMIT", "120/minute")
+limiter = Limiter(key_func=get_remote_address, default_limits=[_DEFAULT_RATE])
 
 
 @asynccontextmanager
@@ -97,6 +104,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Applies the limiter's default_limits to every route (not just the ones with an
+# explicit @limiter.limit), so no public read endpoint is unbounded.
+app.add_middleware(SlowAPIMiddleware)
 
 # Server-rendered frontend (Jinja). Kept simple for WebPositive (see task 03).
 _HERE = Path(__file__).parent
@@ -663,7 +673,8 @@ def _record_download(session: Session, cicheto_id: str, channel: str,
 
 
 @app.get("/resolve/{cicheto_id}")
-def resolve(cicheto_id: str,
+@limiter.limit("60/minute")
+def resolve(request: Request, cicheto_id: str,
             channel: str = "stable",
             arch: Optional[str] = None,
             session: Session = Depends(get_session)):
@@ -1396,7 +1407,9 @@ def _hpkg_url_for_icon(row: CichetoRow) -> Optional[str]:
 
 
 @app.get("/icon/{cicheto_id}")
-def app_icon(cicheto_id: str, session: Session = Depends(get_session)):
+@limiter.limit("60/minute")
+def app_icon(request: Request, cicheto_id: str,
+             session: Session = Depends(get_session)):
     """Serve an app's icon as PNG, extracted from its hpkg (cached). 404 when
     no icon is available, the package is too big, or hvif2png is not configured;
     the frontend then shows its generated placeholder."""
@@ -1554,7 +1567,8 @@ def _placeholder_summary(summary: str, name: str) -> bool:
 
 
 @app.get("/screenshot/{code}")
-def screenshot(code: str):
+@limiter.limit("60/minute")
+def screenshot(request: Request, code: str):
     """Proxy + cache a single HaikuDepotServer screenshot PNG. The image stays
     HDS's; we cache it so the app page is fast and does not send the visitor's
     browser to depot.haiku-os.org on every view. 404 if HDS has no such image."""
