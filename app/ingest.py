@@ -22,7 +22,7 @@ from sqlmodel import Session, select
 
 from . import config
 from .db import engine
-from .models import CichetoRow
+from .models import CichetoRow, dedup_key_for_name
 from .schemas import Cicheto
 
 # Caps so a malicious bàcaro cannot hang the clone or fill the disk.
@@ -116,6 +116,7 @@ def ingest_directory(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
             row = CichetoRow(
                 id=c.id,
                 name=c.name,
+                dedup_key=dedup_key_for_name(c.name),
                 summary=c.summary,
                 bacaro=bacaro_slug,
                 categories=",".join(c.categories),

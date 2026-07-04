@@ -11,7 +11,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import event
 from sqlmodel import SQLModel, Field, Column, JSON
+
+
+def dedup_key_for_name(name: str) -> str:
+    """The identity that makes two cichéti 'the same app in different repos':
+    the name lowercased with - and _ folded together (so 'yab' from fatelk and
+    'yab' from haikuports collide, but 'yab' and 'yab_devel' do not). Stored on
+    the row (indexed) so grouping is a WHERE lookup, not a scan."""
+    return (name or "").strip().lower().replace("-", "_")
 
 
 class CichetoRow(SQLModel, table=True):
@@ -20,6 +29,10 @@ class CichetoRow(SQLModel, table=True):
 
     id: str = Field(primary_key=True)          # org.haiku.genio
     name: str = Field(index=True)
+    # Normalized name used to group the same app across repos (lowercased, - and _
+    # folded). Indexed so "other copies of this app" is a WHERE dedup_key = ?
+    # lookup instead of a full-table scan + Python filter on every app-page view.
+    dedup_key: str = Field(default="", index=True)
     summary: str = ""
     bacaro: str = Field(default="", index=True)  # which tap it came from
     categories: str = Field(default="")          # comma-joined, for cheap LIKE search
@@ -27,6 +40,16 @@ class CichetoRow(SQLModel, table=True):
     channels: str = Field(default="")            # comma-joined channel names
     raw: dict = Field(default_factory=dict, sa_column=Column(JSON))  # full cichéto
     ingested_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Keep dedup_key in sync with name automatically, so every insert/update (ingest,
+# import-hpkr, tests, future call sites) gets the right value without having to
+# remember to set it. Derived from name unless explicitly provided non-empty.
+@event.listens_for(CichetoRow, "before_insert", propagate=True)
+@event.listens_for(CichetoRow, "before_update", propagate=True)
+def _fill_dedup_key(mapper, connection, target):  # noqa: ANN001
+    # dedup_key is a pure function of name; keep them in lockstep.
+    target.dedup_key = dedup_key_for_name(target.name)
 
 
 class User(SQLModel, table=True):

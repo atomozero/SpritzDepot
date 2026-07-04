@@ -50,7 +50,8 @@ from jose import JWTError, jwt
 from .config import check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_directory, ingest_git, list_bacari
-from .models import Bacaro, CichetoRow, DownloadEvent, InstallState, User
+from .models import (Bacaro, CichetoRow, DownloadEvent, InstallState, User,
+                     dedup_key_for_name)
 from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
@@ -420,10 +421,10 @@ def _row_dict(r: CichetoRow) -> dict:
 
 
 def _dedup_key(row: dict) -> str:
-    """The identity that makes two cichéti 'the same app in different repos':
-    the name, lowercased with - and _ folded together (so 'yab' from fatelk and
-    'yab' from haikuports collide, but 'yab' and 'yab_devel' do not)."""
-    return (row.get("name") or "").strip().lower().replace("-", "_")
+    """Dedup key for a plain dict (home shelves work on _row_dict dicts). The
+    canonical implementation lives in models.dedup_key_for_name; the DB column
+    CichetoRow.dedup_key holds the same value, indexed, for WHERE lookups."""
+    return dedup_key_for_name(row.get("name") or "")
 
 
 # Which bàcaro a grouped card should represent, low number = preferred. The
@@ -541,13 +542,15 @@ def _also_in_sources(session: Session, row: CichetoRow) -> dict:
     others); `newest_id` is that id, or None when versions cannot be compared
     (unknown/ombra/unparseable) so the UI does not assert a false 'latest'. No
     live resolve: versions are best-effort from the cache."""
-    key = _dedup_key({"name": row.name})
+    key = dedup_key_for_name(row.name)
     if not key:
         return {"sources": [], "newest_id": None}
 
-    others = session.exec(
-        select(CichetoRow).where(CichetoRow.id != row.id)).all()
-    twins = [o for o in others if _dedup_key({"name": o.name}) == key]
+    # Indexed WHERE dedup_key = ? instead of scanning all ~6k rows and filtering
+    # in Python on every app-page view.
+    twins = session.exec(
+        select(CichetoRow).where(CichetoRow.dedup_key == key,
+                                 CichetoRow.id != row.id)).all()
     if not twins:
         return {"sources": [], "newest_id": None}
 
@@ -593,7 +596,10 @@ def _search_rows(session: Session, q: str = "", category: str = "",
     """Filtered, paginated search. Returns (rows, total). Shared by the JSON API
     and the HTML home."""
     base = _search_query(q, category, bacaro, exclude_hidden)
-    total = len(session.exec(base).all())
+    # Count with SELECT count(*) over the filtered query rather than materializing
+    # every matching row just to len() it (was O(n) in Python per request).
+    total = session.exec(
+        select(func.count()).select_from(base.subquery())).one()
     rows = session.exec(base.order_by(CichetoRow.name)
                         .offset(offset).limit(limit)).all()
     return [_row_dict(r) for r in rows], total
@@ -1498,12 +1504,12 @@ def _borrow_twin_icon(session: Session, row: CichetoRow) -> Optional[bytes]:
     """Icon of a twin copy (same dedup key, different id) that has an extractable
     one. Prefers a cached PNG; else tries to extract, best-ranked source first.
     Returns the PNG bytes, or None if no twin yields an icon."""
-    key = _dedup_key({"name": row.name})
+    key = dedup_key_for_name(row.name)
     if not key:
         return None
-    twins = [o for o in session.exec(
-                 select(CichetoRow).where(CichetoRow.id != row.id)).all()
-             if _dedup_key({"name": o.name}) == key]
+    twins = list(session.exec(
+        select(CichetoRow).where(CichetoRow.dedup_key == key,
+                                 CichetoRow.id != row.id)).all())
     # Try the source closest to the author first (rank ascending).
     twins.sort(key=lambda o: _bacaro_rank(o.bacaro))
     for twin in twins:
