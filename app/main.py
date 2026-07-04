@@ -190,10 +190,12 @@ def _bearer_admin_user(authorization: Optional[str],
         return None
     token = authorization[7:].strip()
     try:
-        payload = jwt.decode(token, auth_config.SECRET_KEY, algorithms=[auth_config.ALGORITHM])
-        user_id = int(payload.get("sub"))
-        token_ver = int(payload.get("ver", 0))
-    except (JWTError, TypeError, ValueError):
+        payload = jwt.decode(token, auth_config.SECRET_KEY,
+                             algorithms=[auth_config.ALGORITHM],
+                             options=auth_config._REQUIRED_CLAIMS)
+        user_id = int(payload["sub"])
+        token_ver = int(payload["ver"])
+    except (JWTError, TypeError, ValueError, KeyError):
         return None
     user = session.get(User, user_id)
     if user is None or token_ver != user.token_version or not user.is_admin:
@@ -348,8 +350,14 @@ def register(request: Request, body: RegisterBody,
 def login(request: Request, body: LoginBody,
           session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == body.email)).first()
-    # Generic 401 either way: never leak whether the email exists.
-    if not user or not verify_password(body.password, user.password_hash):
+    # Constant-time-ish: always run a bcrypt verify, even when the email is
+    # unknown (against a fixed dummy hash), so the response time does not reveal
+    # whether the account exists. Otherwise the "no such user" path skips bcrypt
+    # and returns far faster, a timing oracle for email enumeration.
+    if user is None:
+        verify_password(body.password, auth_config.DUMMY_PASSWORD_HASH)
+        raise HTTPException(401, "Wrong email or password")
+    if not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Wrong email or password")
     return TokenOut(access_token=make_token(user))
 

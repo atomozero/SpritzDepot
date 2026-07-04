@@ -27,6 +27,12 @@ MIN_PASSWORD_LENGTH = 8
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+# Claims that MUST be present for a token to be accepted. Absence fails closed:
+# a token without exp would never expire, one without ver would bypass the
+# token_version revocation check (both were latent fail-open with .get defaults).
+_REQUIRED_CLAIMS = {"require_exp": True, "require_sub": True,
+                    "require": ["exp", "sub", "ver"]}
+
 
 def hash_password(plain: str) -> str:
     # bcrypt caps input at 72 bytes; encode and let bcrypt handle the salt.
@@ -38,6 +44,13 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
     except ValueError:
         return False
+
+
+# A fixed bcrypt hash to verify against when a login email is unknown, so the
+# "no such user" path spends the same ~bcrypt time as the "wrong password" path
+# and cannot be timed to enumerate registered emails. Computed once at import.
+DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"spritz-timing-equalizer",
+                                    bcrypt.gensalt()).decode("utf-8")
 
 
 def make_token(user: User) -> str:
@@ -60,10 +73,11 @@ def current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload.get("sub"))
-        token_ver = int(payload.get("ver", 0))
-    except (JWTError, TypeError, ValueError):
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM],
+                             options=_REQUIRED_CLAIMS)
+        user_id = int(payload["sub"])
+        token_ver = int(payload["ver"])   # required claim; KeyError -> 401
+    except (JWTError, TypeError, ValueError, KeyError):
         raise creds_error
     user = session.get(User, user_id)
     if user is None or token_ver != user.token_version:

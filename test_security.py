@@ -85,6 +85,31 @@ after = c.get("/library", headers=auth)
 print("token after logout  ->", after.status_code)
 assert after.status_code == 401, "old token must be rejected after logout-all"
 
+# --- JWT claim validation fails CLOSED: a token missing exp or ver is rejected,
+#     so a hand-crafted/legacy token can't be non-expiring or bypass revocation ---
+from jose import jwt as _jwt
+from datetime import datetime as _dt, timedelta as _td
+from app import auth as _authmod
+_noexp = _jwt.encode({"sub": "1", "ver": 0}, _authmod.SECRET_KEY,
+                     algorithm=_authmod.ALGORITHM)
+_nover = _jwt.encode({"sub": "1", "exp": _dt.utcnow() + _td(hours=1)},
+                     _authmod.SECRET_KEY, algorithm=_authmod.ALGORITHM)
+assert c.get("/library", headers={"Authorization": f"Bearer {_noexp}"}).status_code == 401
+assert c.get("/library", headers={"Authorization": f"Bearer {_nover}"}).status_code == 401
+print("jwt fail-closed      -> ok (no-exp / no-ver tokens rejected)")
+
+# --- login is constant-time-ish: the unknown-email path also runs bcrypt, so it
+#     is not orders of magnitude faster (which would enumerate accounts) ---
+import time as _time
+def _login_ms(email):
+    s = _time.perf_counter()
+    c.post("/auth/login", json={"email": email, "password": "wrongpass123456"})
+    return (_time.perf_counter() - s) * 1000
+_login_ms("nobody@x.io"); _login_ms("rev@x.io")   # warm up
+_unknown = _login_ms("nobody-here@x.io")
+assert _unknown > 10, f"unknown-email login too fast ({_unknown:.0f}ms): no bcrypt?"
+print("login timing         -> ok (unknown email still pays bcrypt)")
+
 # --- change-password also revokes, and verifies the old password ---
 reg2 = c.post("/auth/register",
               json={"email": "cp@x.io", "password": "longenough1"})
