@@ -21,6 +21,13 @@ body {
 a { color: #2563eb; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* Visible keyboard focus everywhere (audit a11y): buttons, links, badges and the
+   language picker had none, so tabbing was invisible. Cyan ring, WebPositive-safe. */
+.btn:focus, .header-link:focus, a.badge:focus, .app-link:focus,
+.lang-picker:focus, .cat-list a:focus, .brand:focus {
+  outline: 2px solid #22d3ee; outline-offset: 2px;
+}
+
 /* ---------- Header: dark, gradient, cyan accent ---------- */
 .site-header {
   display: flex;
@@ -271,3 +278,37 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
   color: #64748b; font-size: 14px; border-top: 1px solid #d8e0ea;
   text-align: center; box-sizing: border-box; flex-shrink: 0; }
 .site-footer p { max-width: 760px; margin: 0 auto; }
+
+/* ---------- Narrow screens (phones) ----------
+   The viewport meta tag is set, so honor it. WebPositive is WebKit-based and
+   supports media queries; this stays within the no-grid / no-custom-properties
+   constraint. Below 640px: one card per row, and the flex headers stack and
+   left-align instead of pushing the CTA off to the right. */
+@media (max-width: 640px) {
+  .content { padding: 0 14px 24px; }
+
+  /* one card per row, full width */
+  .app-card { width: 100%; margin: 0 0 16px; min-width: 0; }
+
+  /* app-detail header: icon + titles + CTA stacked, left-aligned */
+  .app-detail-head { flex-direction: column; align-items: flex-start; }
+  .app-detail-head .app-icon { margin-right: 0; }
+  .app-detail-cta { margin-left: 0; text-align: left; width: 100%; }
+  .app-detail { padding: 18px 16px; }
+
+  /* featured shelf: stack the big card so the text isn't crowded */
+  .featured-card { flex-direction: column; align-items: flex-start; }
+  .featured-icon { margin-right: 0; margin-bottom: 12px; }
+  .featured-cta { margin-left: 0; margin-top: 12px; }
+
+  /* hero search fills the width */
+  .search-big input { width: 100%; max-width: none; border-radius: 8px;
+    display: block; margin-bottom: 8px; }
+  .search-big button { width: 100%; border-radius: 8px; }
+  .hero h1 { font-size: 26px; }
+
+  /* header wraps cleanly; keep the language picker from overflowing */
+  .site-header { padding: 10px 14px; }
+  .search-inline { margin: 8px 0; width: 100%; }
+  .search-inline input { width: 100%; min-width: 0; }
+}
