@@ -1166,10 +1166,24 @@ def import_hpkr(request: Request, body: ImportHpkrBody,
 # See app/repo_proxy.py and docs/tasks/01-repo-proxy.md.
 
 def _slug(s: str) -> str:
-    """Filesystem- and URL-safe segment. Used for both the on-disk sub-repo path
-    and the advertised baseUrl, so they never diverge (vendors can have spaces)."""
+    """Filesystem- and URL-safe segment, collision-free.
+
+    Used for both the on-disk sub-repo path and the advertised baseUrl (they must
+    never diverge). A plain character-substitution slug is ambiguous: "Foo Bar"
+    and "Foo/Bar" both become "foo-bar", so two distinct vendors would share one
+    repo dir and the later build would serve packages under a mismatched
+    repo.info, breaking the vendor-match invariant the per-vendor split exists
+    for. When the substitution changes the string (i.e. it was lossy), append a
+    short hash of the ORIGINAL so distinct inputs get distinct slugs; clean
+    inputs (arch names, simple vendors) stay human-readable and stable."""
     import re as _re
-    return _re.sub(r"[^A-Za-z0-9_.-]+", "-", s).strip("-")
+    cleaned = _re.sub(r"[^A-Za-z0-9_.-]+", "-", s).strip("-")
+    if cleaned == s:
+        return cleaned
+    import hashlib as _h
+    suffix = _h.sha1(s.encode("utf-8")).hexdigest()[:8]
+    base = cleaned or "x"
+    return f"{base}-{suffix}"
 
 
 def _subrepo_dir(vendor: str, arch: str) -> Path:

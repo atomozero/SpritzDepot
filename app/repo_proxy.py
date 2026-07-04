@@ -263,11 +263,23 @@ def build_subrepo(hpkgs: list[Path], vendor: str, architecture: str,
     # Stage packages under packages/ with their canonical filenames, the names
     # the HPKR catalog will record (name-version-arch.hpkg), so fetches resolve.
     staged: list[Path] = []
+    wanted_names: set[str] = set()
     for h in hpkgs:
-        target = pkg_dir / canonical_filename(read_package_meta(h))
+        fname = canonical_filename(read_package_meta(h))
+        wanted_names.add(fname)
+        target = pkg_dir / fname
         if target.resolve() != h.resolve():
             shutil.copy2(h, target)
         staged.append(target)
+
+    # Prune stale hpkg: a previous build may have left files for packages that
+    # are no longer in the stable set (author removed one, sha changed, cichéto
+    # pruned). The catalog would omit them but the packages/ route serves any
+    # file present, so de-listed bytes would keep being downloadable. Remove
+    # everything not in the current wanted set so packages/ matches the catalog.
+    for existing in pkg_dir.iterdir():
+        if existing.is_file() and existing.name not in wanted_names:
+            existing.unlink()
 
     # `package_repo create <repo-info> <package...>` writes a file named "repo"
     # next to the repo.info it was given (not into the cwd, and there is no
