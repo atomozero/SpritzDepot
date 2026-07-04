@@ -9,3 +9,7 @@ packages-cache/
 # Local tooling context and config (not part of the project)
 CLAUDE.md
 .claude/
+spritz.db-wal
+spritz.db-shm
+*.db-wal
+*.db-shm
