@@ -1140,7 +1140,17 @@ def _rebuild_all_repos(session: Session) -> dict:
     errors: list[str] = []
     for cid, arch, url, sha in _stable_hpkg_artifacts(session):
         try:
-            dest = cache / f"{cid}-{arch}.hpkg"
+            # Defense in depth: the schema already forbids path chars in id, but
+            # arch is a manifest-controlled dict key. Refuse anything that would
+            # escape the cache dir rather than trust the filename.
+            fname = f"{cid}-{arch}.hpkg"
+            if "/" in fname or "\\" in fname or ".." in fname:
+                errors.append(f"{cid}/{arch}: unsafe artifact name")
+                continue
+            dest = cache / fname
+            if cache.resolve() not in dest.resolve().parents:
+                errors.append(f"{cid}/{arch}: artifact path escapes cache")
+                continue
             repo_proxy.fetch_verified(url, sha, dest)
             meta = repo_proxy.read_package_meta(dest)
             groups.setdefault((meta.vendor, meta.architecture), []).append(dest)

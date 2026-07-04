@@ -79,17 +79,29 @@ class Channel(BaseModel):
     package: Optional[str] = None    # package name as it appears in that catalog
 
 
+# The id is a reverse-domain string used BOTH as a DB primary key AND
+# interpolated into cache filenames (e.g. f"{id}-{arch}.hpkg"). It must be
+# strictly validated so a malicious bàcaro cannot smuggle path traversal
+# (id: "../../etc/...") into an arbitrary file write, and cannot inject anything
+# odd into the DB. Character set: lowercase alnum plus + . _ - (the '+' appears
+# in real Haiku package names like libsigc++), at least two dot-joined labels.
+# Path separators and '..' are excluded both by the charset and the explicit
+# check in the validator below. A label cannot start/end with a separator.
+_ID_RE = __import__("re").compile(
+    r"^[a-z0-9+]+([._-][a-z0-9+]+)*\.[a-z0-9+]+([._-][a-z0-9+]+)*$")
+
+
 class Cicheto(BaseModel):
     """The full manifest."""
     cicheto: int = 1                 # schema version
-    id: str                          # reverse-domain, unique key, e.g. org.haiku.genio
-    name: str
-    summary: str
+    id: str = Field(min_length=3, max_length=128)   # reverse-domain, e.g. org.haiku.genio
+    name: str = Field(min_length=1, max_length=200)
+    summary: str = Field(default="", max_length=2000)
     homepage: Optional[HttpUrl] = None
-    license: Optional[str] = None
-    categories: list[str] = Field(default_factory=list)
+    license: Optional[str] = Field(default=None, max_length=200)
+    categories: list[str] = Field(default_factory=list, max_length=64)
     icon: Optional[HttpUrl] = None
-    screenshots: list[HttpUrl] = Field(default_factory=list)
+    screenshots: list[HttpUrl] = Field(default_factory=list, max_length=32)
 
     author: Optional[Author] = None
     packager: Optional[Packager] = None
@@ -97,9 +109,20 @@ class Cicheto(BaseModel):
 
     # At least one channel, keyed by channel name. min_length enforces it
     # (a cichéto with no channels is meaningless: nothing to install).
-    channels: dict[str, Channel] = Field(min_length=1)
+    channels: dict[str, Channel] = Field(min_length=1, max_length=32)
 
     model_config = ConfigDict(use_enum_values=True)
+
+    @field_validator("id")
+    @classmethod
+    def _safe_id(cls, v: str) -> str:
+        if not _ID_RE.match(v):
+            raise ValueError(
+                "id must be a reverse-domain string (lowercase alnum labels "
+                "joined by dots, e.g. org.haiku.genio); no path characters")
+        if ".." in v or "/" in v or "\\" in v:
+            raise ValueError("id must not contain path separators or '..'")
+        return v
 
 
 def cicheto_to_yaml(c: "Cicheto") -> str:

@@ -38,14 +38,24 @@ def tool_available() -> bool:
 
 
 def _extract_hvif(hpkg: bytes) -> bytes:
-    """Find the HVIF icon blob in an hpkg's decompressed heap."""
-    if hpkg[:4] != b"hpkg":
+    """Find the HVIF icon blob in an hpkg's decompressed heap.
+
+    The hpkg is untrusted (an author-supplied download), so a truncated or
+    crafted header must fail as IconError, not an unhandled struct.error.
+    """
+    _HDR = ">4sHHQHHIQQ"
+    if len(hpkg) < 4 or hpkg[:4] != b"hpkg":
         raise IconError("not an hpkg")
+    if len(hpkg) < struct.calcsize(_HDR):
+        raise IconError("hpkg too small for its header")
     # hpkg header: magic(4) header_size(2) version(2) total_size(8) minor(2)
     #   heap_compression(2) heap_chunk_size(4) heap_size_compressed(8)
     #   heap_size_uncompressed(8) ...
-    (_magic, header_size, _ver, _total, _minor, heap_comp, chunk_size,
-     heap_comp_size, heap_uncomp_size) = struct.unpack_from(">4sHHQHHIQQ", hpkg, 0)
+    try:
+        (_magic, header_size, _ver, _total, _minor, heap_comp, chunk_size,
+         heap_comp_size, heap_uncomp_size) = struct.unpack_from(_HDR, hpkg, 0)
+    except struct.error as e:
+        raise IconError(f"malformed hpkg header: {e}") from e
     heap_raw = hpkg[header_size:header_size + heap_comp_size]
     try:
         heap = decompress_heap(heap_comp, heap_raw, heap_uncomp_size, chunk_size)

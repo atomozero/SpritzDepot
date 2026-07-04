@@ -112,6 +112,23 @@ def ingest_directory(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
             except (ValidationError, yaml.YAMLError) as e:
                 failed.append({"file": str(f.name), "error": str(e)[:200]})
                 continue
+            except Exception as e:  # noqa: BLE001 - one bad file must not abort the crawl
+                # A non-UTF-8 file, a YAML alias bomb (MemoryError), deep nesting
+                # (RecursionError), a broken symlink (OSError): skip it, don't let
+                # a single crafted manifest deny service to every valid one.
+                failed.append({"file": str(f.name), "error": f"{type(e).__name__}: {e}"[:200]})
+                continue
+
+            # Anti-hijack: the cache is keyed by id (primary key), so a merge from
+            # bàcaro B with an id already owned by bàcaro A would overwrite A's
+            # row (name, channels, download URLs) - a supply-chain takeover of a
+            # known app. Refuse to cross bàcaro boundaries; the owner keeps its id.
+            existing = session.get(CichetoRow, c.id)
+            if existing is not None and existing.bacaro not in ("", bacaro_slug):
+                failed.append({"file": str(f.name),
+                               "error": f"id '{c.id}' already owned by bàcaro "
+                                        f"'{existing.bacaro}'"})
+                continue
 
             row = CichetoRow(
                 id=c.id,
@@ -124,7 +141,7 @@ def ingest_directory(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
                 channels=",".join(c.channels.keys()),
                 raw=c.model_dump(mode="json"),
             )
-            session.merge(row)  # upsert by primary key
+            session.merge(row)  # upsert by primary key (same bàcaro only, per check above)
             ok.append(c.id)
 
         removed = []

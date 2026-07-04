@@ -126,6 +126,8 @@ class _Reader:
         return self.pos >= len(self.data)
 
     def u8(self) -> int:
+        if self.pos >= len(self.data):
+            raise HpkrError("unexpected end of catalog reading u8")
         b = self.data[self.pos]
         self.pos += 1
         return b
@@ -134,15 +136,23 @@ class _Reader:
         # Attribute integers are big-endian (B_HOST_TO_BENDIAN in the writer).
         vals = {1: ">B", 2: ">H", 4: ">I", 8: ">Q"}
         fmt = vals[width]
+        if self.pos + width > len(self.data):
+            raise HpkrError("unexpected end of catalog reading uint")
         v = struct.unpack_from(fmt, self.data, self.pos)[0]
         self.pos += width
         return v
 
     def leb128(self) -> int:
-        """Unsigned LEB128."""
+        """Unsigned LEB128, bounded. A u64 needs at most 10 bytes; a run of
+        continuation bytes past the buffer (or past 64 bits) is a crafted catalog,
+        not valid data, so we raise instead of over-reading / building a bignum."""
         result = 0
         shift = 0
         while True:
+            if self.pos >= len(self.data):
+                raise HpkrError("unexpected end of catalog reading leb128")
+            if shift >= 64:
+                raise HpkrError("leb128 value too long (> 64 bits)")
             b = self.data[self.pos]
             self.pos += 1
             result |= (b & 0x7f) << shift
@@ -152,7 +162,9 @@ class _Reader:
         return result
 
     def cstring(self) -> str:
-        end = self.data.index(b"\x00", self.pos)
+        end = self.data.find(b"\x00", self.pos)
+        if end == -1:
+            raise HpkrError("unterminated string in catalog")
         s = self.data[self.pos:end].decode("utf-8", "replace")
         self.pos = end + 1
         return s
@@ -176,6 +188,8 @@ def _read_value(r: _Reader, data_type: int, encoding: int, strings: list):
         # inline (enc 0): size then bytes; heap ref (enc 1): size + offset.
         if encoding == 0:
             size = r.leb128()
+            if size < 0 or r.pos + size > len(r.data):
+                raise HpkrError("raw value size out of range")
             v = r.data[r.pos:r.pos + size]
             r.pos += size
             return v
@@ -184,9 +198,17 @@ def _read_value(r: _Reader, data_type: int, encoding: int, strings: list):
     raise HpkrError(f"unknown data type {data_type}")
 
 
-def _walk(r: _Reader, strings: list, on_package):
+# Haiku package attribute nesting is shallow (package -> version.major -> parts).
+# Cap recursion so a crafted catalog that is a deep chain of has_children tags
+# can't blow the Python/C stack (RecursionError). 64 is far beyond any real file.
+_MAX_ATTR_DEPTH = 64
+
+
+def _walk(r: _Reader, strings: list, on_package, depth: int = 0):
     """Walk attributes at the current nesting level until a zero tag. Calls
     on_package(attrs_dict) for each top-level 'package' attribute."""
+    if depth > _MAX_ATTR_DEPTH:
+        raise HpkrError("attribute nesting too deep")
     while not r.eof():
         tag = r.leb128()
         if tag == 0:
@@ -202,18 +224,18 @@ def _walk(r: _Reader, strings: list, on_package):
         if attr_id == ATTR_PACKAGE:
             pkg: dict = {}
             if has_children:
-                _collect_package(r, strings, pkg)
+                _collect_package(r, strings, pkg, depth + 1)
             on_package(pkg)
         elif has_children:
             # Descend but ignore (some other container); skip its children.
-            _skip_children(r, strings)
+            _skip_children(r, strings, depth + 1)
 
 
 _WANTED = {ATTR_PACKAGE_NAME, ATTR_PACKAGE_ARCHITECTURE, ATTR_VERSION_MAJOR,
            ATTR_VERSION_MINOR, ATTR_VERSION_MICRO, ATTR_VERSION_REVISION}
 
 
-def _collect_package(r: _Reader, strings: list, pkg: dict):
+def _collect_package(r: _Reader, strings: list, pkg: dict, depth: int = 0):
     """Collect a 'package' container's attributes into pkg, until a zero tag.
 
     The version is nested: version.major carries minor/micro/revision as its
@@ -221,6 +243,8 @@ def _collect_package(r: _Reader, strings: list, pkg: dict):
     name/version.major plus the version sub-parts), and only descend into the
     version.major subtree; other children (e.g. provides/requires with their own
     version subtrees) are skipped so their version parts do not overwrite ours."""
+    if depth > _MAX_ATTR_DEPTH:
+        raise HpkrError("attribute nesting too deep")
     while not r.eof():
         tag = r.leb128()
         if tag == 0:
@@ -239,13 +263,15 @@ def _collect_package(r: _Reader, strings: list, pkg: dict):
             # Only the top-level version.major subtree holds the version parts
             # we want; descend into it, skip everything else.
             if attr_id == ATTR_VERSION_MAJOR:
-                _collect_package(r, strings, pkg)
+                _collect_package(r, strings, pkg, depth + 1)
             else:
-                _skip_children(r, strings)
+                _skip_children(r, strings, depth + 1)
 
 
-def _skip_children(r: _Reader, strings: list):
+def _skip_children(r: _Reader, strings: list, depth: int = 0):
     """Consume a child list (and nested ones) without recording anything."""
+    if depth > _MAX_ATTR_DEPTH:
+        raise HpkrError("attribute nesting too deep")
     while not r.eof():
         tag = r.leb128()
         if tag == 0:
@@ -256,7 +282,7 @@ def _skip_children(r: _Reader, strings: list):
         encoding = (tag >> _ENCODING_SHIFT) & _ENCODING_MASK
         _read_value(r, data_type, encoding, strings)
         if has_children:
-            _skip_children(r, strings)
+            _skip_children(r, strings, depth + 1)
 
 
 def _compose_version(pkg: dict) -> str:
@@ -277,12 +303,28 @@ def _compose_version(pkg: dict) -> str:
 def parse_catalog(blob: bytes) -> list:
     """Parse an HPKR 'repo' catalog and return a list of RepoPackage.
 
-    Reads the header, decompresses the heap, and walks the package-attributes
-    section (which sits at the end of the heap). Strings live in a table that
-    precedes the attributes.
+    The catalog is untrusted (fetched from a third-party repo), so this wrapper
+    turns ANY parser exception into HpkrError. The inner parser already raises
+    HpkrError for the cases it validates, but a crafted catalog can still trigger
+    struct.error (truncated header), RecursionError (deep nesting), MemoryError,
+    etc.; callers only catch HpkrError, so without this a bad catalog would
+    surface as an unhandled 500 / worker crash instead of a clean failure.
     """
-    if blob[:4] != HPKR_MAGIC:
+    try:
+        return _parse_catalog_inner(blob)
+    except HpkrError:
+        raise
+    except Exception as e:  # noqa: BLE001 - untrusted input, fail as domain error
+        raise HpkrError(f"malformed catalog: {type(e).__name__}: {e}") from e
+
+
+def _parse_catalog_inner(blob: bytes) -> list:
+    if len(blob) < 4 or blob[:4] != HPKR_MAGIC:
         raise HpkrError("not an HPKR file (bad magic)")
+    # Bound the header reads: the two unpacks below need this many bytes.
+    _need = struct.calcsize(">4sHHQHHIQQ") + struct.calcsize(">IIQQQ")
+    if len(blob) < _need:
+        raise HpkrError("catalog too small for its header")
 
     # Header (big-endian per the format's network order). Field offsets:
     # magic(4) header_size(2) version(2) total_size(8) minor(2)
@@ -301,7 +343,11 @@ def parse_catalog(blob: bytes) -> list:
     except HeapError as e:
         raise HpkrError(str(e)) from e
 
-    # The package-attributes section is at the end of the heap.
+    # The package-attributes section is at the end of the heap. Guard against a
+    # lying packages_length: > len(heap) makes the slice start negative (Python
+    # negative indexing) and mis-parses from an attacker-chosen offset.
+    if packages_length > len(heap):
+        raise HpkrError("packages_length exceeds heap size")
     pkg_section = heap[len(heap) - packages_length:]
     r = _Reader(pkg_section)
 

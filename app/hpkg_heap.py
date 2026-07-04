@@ -23,6 +23,14 @@ import zlib
 
 DEFAULT_CHUNK_SIZE = 64 * 1024
 
+# The decompressed size and chunk size are read from an attacker-controlled
+# header (a malicious third-party repo picks them). Cap them so a decompression
+# bomb (tiny compressed input claiming gigabytes uncompressed) cannot exhaust
+# memory, and so a zero/absurd chunk size cannot divide-by-zero or explode the
+# chunk count. 256 MiB comfortably covers any real Haiku package heap.
+MAX_HEAP_UNCOMPRESSED = 256 * 1024 * 1024
+MAX_CHUNK_SIZE = 16 * 1024 * 1024
+
 
 class HeapError(RuntimeError):
     """Heap could not be decompressed (unsupported compression / corrupt data)."""
@@ -62,6 +70,16 @@ def decompress_heap(compression: int, raw: bytes, uncompressed_size: int,
     including the trailing chunk-size table). `chunk_size` is the header's
     `heap_chunk_size`. Raises HeapError on unsupported codecs or corrupt data.
     """
+    # Reject attacker-controlled sizes before they drive any allocation, slice,
+    # or division. chunk_size <= 0 would ZeroDivisionError on the chunk_count
+    # below; an oversized uncompressed_size is a decompression bomb.
+    if uncompressed_size < 0 or uncompressed_size > MAX_HEAP_UNCOMPRESSED:
+        raise HeapError(
+            f"heap uncompressed size {uncompressed_size} out of range "
+            f"(max {MAX_HEAP_UNCOMPRESSED})")
+    if chunk_size <= 0 or chunk_size > MAX_CHUNK_SIZE:
+        raise HeapError(f"invalid heap chunk size {chunk_size}")
+
     if uncompressed_size == 0:
         return b""
     if compression == 0:
