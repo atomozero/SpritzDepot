@@ -13,6 +13,8 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
+import threading
+from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -24,6 +26,19 @@ from . import config
 from .db import engine
 from .models import CichetoRow, dedup_key_for_name
 from .schemas import Cicheto
+
+# Per-bàcaro ingest lock. Two concurrent crawls of the same slug (retry, double
+# click, two admins) each compute their prune set from a stale read, so one
+# commit can delete rows the other just inserted - the projection silently loses
+# apps. Serializing per slug makes ingest single-flight per tap. In-process only
+# (single-worker); a multi-worker prod deploy would need an advisory DB lock.
+_ingest_locks: dict = defaultdict(threading.Lock)
+_ingest_locks_guard = threading.Lock()
+
+
+def _slug_lock(slug: str) -> threading.Lock:
+    with _ingest_locks_guard:
+        return _ingest_locks[slug]
 
 # Caps so a malicious bàcaro cannot hang the clone or fill the disk.
 CLONE_TIMEOUT_SECONDS = 60
@@ -66,16 +81,42 @@ def _dir_size_and_count(path: Path) -> tuple[int, int]:
 
 def _clone_or_pull(git_url: str, dest: Path) -> Path:
     """Shallow-clone a bàcaro repo into dest, with a timeout. Returns the path.
-    Raises IngestError on timeout or if the cloned tree exceeds the caps."""
+    Raises IngestError on timeout, if the clone is incomplete, or if the cloned
+    tree exceeds the caps."""
     _validate_git_url(git_url)
+    # Hardened clone of an untrusted URL:
+    #  -c core.symlinks=false     write symlinks as plain files (no path escape)
+    #  --no-recurse-submodules    don't fetch attacker-declared submodules
+    #  --                         stop option parsing so a URL like
+    #                             "--upload-pack=..." can't inject a git flag
+    # In prod, _validate_git_url already forces https, so also forbid the file://
+    # transport for defense in depth. In dev, local file paths are a legitimate
+    # test/dev case, so we leave the file transport enabled there.
+    cmd = ["git", "-c", "core.symlinks=false"]
+    if config.IS_PROD:
+        cmd += ["-c", "protocol.file.allow=never"]
+    cmd += ["clone", "--depth", "1", "--no-recurse-submodules", "--", git_url,
+            str(dest)]
     try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", git_url, str(dest)],
-            check=True, capture_output=True, text=True,
-            timeout=CLONE_TIMEOUT_SECONDS,
-        )
+        subprocess.run(cmd, check=True, capture_output=True, text=True,
+                       timeout=CLONE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         raise IngestError(f"clone timed out after {CLONE_TIMEOUT_SECONDS}s")
+    except subprocess.CalledProcessError as e:
+        raise IngestError(f"clone failed: {(e.stderr or e.stdout or '').strip()[:200]}")
+
+    # Verify the clone actually completed: a partial/degraded checkout would make
+    # the file list a subset of the real repo, and a destructive prune would then
+    # delete every app whose id isn't in that subset. rev-parse HEAD succeeds only
+    # on a complete clone with a checked-out commit.
+    try:
+        head = subprocess.run(["git", "-C", str(dest), "rev-parse", "HEAD"],
+                              check=True, capture_output=True, text=True,
+                              timeout=30)
+        if not head.stdout.strip():
+            raise IngestError("clone incomplete: no HEAD commit")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        raise IngestError("clone incomplete: could not resolve HEAD")
 
     size, count = _dir_size_and_count(dest)
     if size > MAX_REPO_BYTES:
@@ -91,6 +132,13 @@ def _parse_file(path: Path) -> Cicheto:
 
 
 def ingest_directory(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
+    """Serialized entry point: hold the per-slug lock so two crawls of the same
+    bàcaro can't race the prune. See _ingest_directory_locked for the work."""
+    with _slug_lock(bacaro_slug):
+        return _ingest_directory_locked(root, bacaro_slug, prune)
+
+
+def _ingest_directory_locked(root: Path, bacaro_slug: str, prune: bool = True) -> dict:
     """Walk a directory of cichéti and upsert them, attributing them to
     `bacaro_slug`. With prune=True (default) also drop cichéti previously
     attributed to this bàcaro that did not appear this time, so the cache stays
