@@ -260,6 +260,15 @@ class QueueBody(BaseModel):
     arch: Optional[str] = None
 
 
+class InstalledBody(BaseModel):
+    # The daemon echoes back what it actually installed so a stale confirm can't
+    # flip a row that has since been re-queued on a different channel/arch. Both
+    # optional for backward compatibility: an old daemon that sends nothing still
+    # confirms the current row.
+    channel: Optional[str] = None
+    arch: Optional[str] = None
+
+
 class PublishBody(BaseModel):
     """Flat form fields from the publish page; turned into a cichéto and
     validated against the real schema before being serialized to YAML."""
@@ -895,20 +904,35 @@ def pending(user: User = Depends(current_user),
     for r in rows:
         row = session.get(CichetoRow, r.cicheto_id)
         if not row:
+            # The app was pruned (re-ingest, or its bàcaro deleted) after being
+            # queued. Move the row to a terminal state so it stops re-appearing
+            # and the user's library can show it as no longer available, instead
+            # of the daemon seeing an empty poll entry and retrying forever.
+            r.state = "unavailable"
+            r.updated_at = datetime.utcnow()
+            session.add(r)
+            session.commit()
             continue
         ch = row.raw.get("channels", {}).get(r.channel, {})
+        source = ch.get("source")
+        notes: list = []
+        # Contract (docs/daemon-prompt.md): every pending item carries source,
+        # version, bridge and (possibly empty) notes, so the daemon can tell
+        # stable from ombra (sha256-mandatory vs verify-and-log) and render a
+        # HaikuPorts bridge instead of retrying it as a transient failure.
         item = {
             "cicheto": r.cicheto_id, "channel": r.channel, "arch": r.arch,
             "kind": ch.get("kind", "hpkg"),
+            "source": source,
+            "version": ch.get("version"),
             "artifacts": ch.get("artifacts", {}),
             "requires": ch.get("requires", []),
+            "bridge": row.raw.get("bridge"),
+            "notes": notes,
         }
         # Resolve live-sourced channels here so the daemon gets real download
         # URLs in one poll (no extra /resolve round trip). Best-effort: a resolve
-        # failure leaves empty artifacts + a note, rather than failing the poll;
-        # the daemon should skip such items and retry next time.
-        source = ch.get("source")
-        notes: list = []
+        # failure leaves empty artifacts + a note.
         if source == "github-latest":
             try:
                 artifacts, version = _resolve_ombra(row.raw, ch, r.arch, notes)
@@ -925,17 +949,29 @@ def pending(user: User = Depends(current_user),
                 item["artifacts"] = hpkr.resolve_from_repo(repo_url, package, r.arch)
             except hpkr.HpkrError as e:
                 notes.append(f"hpkr-repo resolve failed: {e}")
-        if notes:
-            item["notes"] = notes
+        elif source == "haikuports":
+            # Bridge-only: no spritz artifact; tell the daemon to install from
+            # HaikuPorts. This is a stable, actionable instruction, NOT a
+            # retryable failure, so the daemon must not busy-loop on it.
+            bridge = row.raw.get("bridge") or {}
+            pkg = bridge.get("haikuports") or row.id
+            notes.append(f"install from HaikuPorts: pkgman install {pkg}")
         out.append(item)
     return out
 
 
 @app.post("/library/{cicheto_id}/installed")
 def mark_installed(cicheto_id: str,
+                   body: InstalledBody = InstalledBody(),
                    user: User = Depends(current_user),
                    session: Session = Depends(get_session)):
-    """Daemon confirms an install landed."""
+    """Daemon confirms an install landed.
+
+    If the daemon reports which channel/arch it installed, only confirm when it
+    matches the current row. This prevents a stale confirm (daemon finished the
+    stable build) from flipping a row the user has since re-queued on ombra,
+    which would silently drop the ombra request the user actually wants.
+    """
     row = session.exec(
         select(InstallState).where(
             InstallState.user_id == user.id,
@@ -944,6 +980,11 @@ def mark_installed(cicheto_id: str,
     ).first()
     if not row:
         raise HTTPException(404, "Not in library")
+    if body.channel is not None and body.channel != row.channel:
+        # The row now represents a different queued request; this confirm is
+        # stale. Acknowledge without clobbering it so the daemon doesn't error.
+        return {"status": "superseded", "cicheto": cicheto_id,
+                "current_channel": row.channel}
     row.state = "installed"
     row.updated_at = datetime.utcnow()
     session.add(row)

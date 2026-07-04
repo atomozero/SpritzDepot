@@ -111,20 +111,34 @@ Per-user, bearer auth:
 ```
 GET  /library/pending
 ```
-Returns the items to install:
+Returns the items to install. Every item carries the same fields as `/resolve`
+so you can decide how to handle it without a second call:
 ```json
 [{ "cicheto": "org.haiku.genio", "channel": "stable", "arch": "x86_64",
-   "kind": "hpkg", "artifacts": {...}, "requires": [...], "version": "...",
-   "notes": [...] }]
+   "kind": "hpkg", "source": null, "version": "...",
+   "artifacts": {...}, "requires": [...],
+   "bridge": { "haikuports": "genio" }, "notes": [] }]
 ```
 Live-sourced items (ombra and hpkr-repo) are already resolved here, with
 `artifacts` filled with real download URLs, so you never need an extra /resolve
-call from the pending list. If an item comes back with empty `artifacts` and a
-`notes` entry, the live resolve failed upstream: skip it and retry on the next
-poll, do not treat it as installable.
+call from the pending list.
+
+Deciding what an item means, by `source` and `notes`:
+- `source: "haikuports"` -> `artifacts` is empty by design and `notes` carries
+  `install from HaikuPorts: pkgman install <pkg>`. This is an ACTIONABLE
+  instruction, not a failure: run the pkgman command (or point the user to it),
+  then confirm. Do NOT treat it as a transient error to retry.
+- Any OTHER source with empty `artifacts` AND a `notes` entry means a live
+  resolve failed upstream: skip it and retry on the next poll.
 ```
 POST /library/{id}/installed     (bearer)  -> mark it installed once it landed
+     body (optional): { "channel": "...", "arch": "..." }
 ```
+Echo back the `channel`/`arch` you actually installed. If the user re-queued the
+same app on a different channel while you were installing, the server returns
+`{"status": "superseded"}` and keeps their newer request instead of overwriting
+it. Sending no body still confirms the current row (backward compatible).
+
 Poll `/library/pending` on a sensible interval (e.g. 30-60s), install each new
 item, then POST `/library/{id}/installed`.
 
