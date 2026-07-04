@@ -41,7 +41,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
-from . import config, hds, hpkr, hvif, i18n, netguard, ombra, repo_proxy, uploads, version
+from . import (cache, config, hds, hpkr, hvif, i18n, netguard, ombra,
+               repo_proxy, uploads, version)
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
@@ -1449,9 +1450,9 @@ def app_icon(request: Request, cicheto_id: str,
     if "/" in cicheto_id or "\\" in cicheto_id:
         raise HTTPException(400, "bad id")
     icons_dir = Path(config.UPLOAD_DIR) / "icons"
-    cache = icons_dir / f"{cicheto_id}.png"
-    if cache.is_file():
-        return FileResponse(cache, media_type="image/png")
+    cache_path = icons_dir / f"{cicheto_id}.png"
+    if cache_path.is_file():
+        return FileResponse(cache_path, media_type="image/png")
     # Negative cache: extracting an icon means downloading the hpkg (seconds for
     # a big library like ffmpeg) only to find it ships no HVIF. Once we know an
     # app yields no icon, remember it so later requests 404 instantly instead of
@@ -1477,9 +1478,8 @@ def app_icon(request: Request, cicheto_id: str,
         icons_dir.mkdir(parents=True, exist_ok=True)
         miss.write_bytes(b"")      # remember the miss; don't re-download next time
         raise HTTPException(404, "no icon available")
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_bytes(png)
-    return FileResponse(cache, media_type="image/png")
+    cache.write_capped(cache_path, png)   # size-bounded LRU cache
+    return FileResponse(cache_path, media_type="image/png")
 
 
 def _extract_icon(row: CichetoRow) -> Optional[bytes]:
@@ -1513,8 +1513,7 @@ def _borrow_twin_icon(session: Session, row: CichetoRow) -> Optional[bytes]:
         png = _extract_icon(twin)
         if png is not None:
             # Cache under the twin's id too, so its own page is fast next time.
-            cached.parent.mkdir(parents=True, exist_ok=True)
-            cached.write_bytes(png)
+            cache.write_capped(cached, png)
             return png
     return None
 
@@ -1608,15 +1607,14 @@ def screenshot(request: Request, code: str):
     # code is an HDS GUID; reject anything that could escape the cache dir.
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", code):
         raise HTTPException(400, "bad screenshot code")
-    cache = Path(config.UPLOAD_DIR) / "screenshots" / f"{code}.png"
-    if cache.is_file():
-        return FileResponse(cache, media_type="image/png")
+    cache_path = Path(config.UPLOAD_DIR) / "screenshots" / f"{code}.png"
+    if cache_path.is_file():
+        return FileResponse(cache_path, media_type="image/png")
     png = hds.screenshot_bytes(code)
     if png is None:
         raise HTTPException(404, "screenshot not available")
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_bytes(png)
-    return FileResponse(cache, media_type="image/png")
+    cache.write_capped(cache_path, png)   # size-bounded LRU cache
+    return FileResponse(cache_path, media_type="image/png")
 
 
 @app.get("/screenshots/{cicheto_id}")

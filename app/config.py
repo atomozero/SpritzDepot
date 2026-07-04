@@ -78,8 +78,20 @@ MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5 MB
 # the frontend shows the generated placeholder. We refuse to download an hpkg
 # larger than this just to pull an icon out of it.
 HVIF2PNG_BIN = os.environ.get("SPRITZ_HVIF2PNG_BIN")
+# A Haiku package puts its HVIF icon in the package attributes near the start, so
+# we never need the whole hpkg to extract it. 100 MB was excessive (a single icon
+# request could pull tens of MB); 25 MB comfortably covers real apps while cutting
+# the bandwidth/time an attacker can force per /icon call. Raise if a legit app is
+# ever truncated.
 MAX_HPKG_FETCH_FOR_ICON = int(
-    os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(100 * 1024 * 1024)))  # 100 MB
+    os.environ.get("SPRITZ_MAX_HPKG_ICON_BYTES", str(25 * 1024 * 1024)))  # 25 MB
+
+# Total-size cap for the on-disk media cache (extracted icons + proxied
+# screenshots under UPLOAD_DIR). Without a bound, enumerating icon/screenshot ids
+# could fill the disk until writes (and SQLite) fail. When a write would exceed
+# this, the least-recently-used cached files are evicted first.
+MAX_CACHE_BYTES = int(
+    os.environ.get("SPRITZ_MAX_CACHE_BYTES", str(2 * 1024 * 1024 * 1024)))  # 2 GB
 
 # Bàcari that are "everything HaikuDepot already shows" (a mirror of HaikuPorts).
 # They stay in the catalog and are fully searchable, but the browse/home view
