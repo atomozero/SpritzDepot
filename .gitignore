@@ -13,3 +13,6 @@ spritz.db-wal
 spritz.db-shm
 *.db-wal
 *.db-shm
+test_*.db
+test_*.db-wal
+test_*.db-shm
