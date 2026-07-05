@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ t('account.title') }} - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail" style="max-width:560px;"
+         data-m-needlogin="{{ t('account.need_login') }}"
+         data-m-wrongpw="{{ t('account.wrong_pw') }}"
+         data-m-deleted="{{ t('account.deleted') }}"
+         data-m-error="{{ t('pub.error') }}">
+  <h1>{{ t('account.title') }}</h1>
+  <p class="lead">{{ t('account.lead') }}</p>
+
+  <section class="install">
+    <h2>{{ t('privacy.rights_title') }}</h2>
+    <p>
+      <a class="btn" id="export-btn" href="#">{{ t('account.export') }}</a>
+    </p>
+    <pre id="export-out" style="display:none; overflow-x:auto;"></pre>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('account.delete_title') }}</h2>
+    <p class="hint">{{ t('account.delete_warn') }}</p>
+    <form id="delete-form">
+      <p>
+        <input type="password" name="password" required class="field"
+               autocomplete="current-password"
+               placeholder="{{ t('login.password') }}">
+      </p>
+      <p>
+        <button type="submit" class="btn btn-danger">{{ t('account.delete_btn') }}</button>
+        <span class="hint" id="delete-status"></span>
+      </p>
+    </form>
+  </section>
+</article>
+
+<script src="/static/account.js"></script>
+{% endblock %}

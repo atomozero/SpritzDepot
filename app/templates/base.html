@@ -21,6 +21,7 @@
     <a class="header-link" href="/publish">{{ t('nav.publish') }}</a>
     <a class="header-link" href="/admin">{{ t('nav.admin') }}</a>
     <span class="header-link" id="nav-who" style="display:none;"></span>
+    <a class="header-link" id="nav-account" href="/account" style="display:none;">{{ t('nav.account') }}</a>
     <a class="header-link" id="nav-login" href="/login">{{ t('nav.login') }}</a>
     <a class="header-link" id="nav-logout" href="#" style="display:none;">{{ t('nav.logout') }}</a>
     <select class="lang-picker" aria-label="{{ t('lang.label') }}"
@@ -37,6 +38,7 @@
 
   <footer class="site-footer">
     <p>{{ t('footer.text') }}</p>
+    <p><a href="/privacy">{{ t('privacy.link') }}</a></p>
   </footer>
 </body>
 </html>

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('privacy.title') }} - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail" style="max-width:720px;">
+  <h1>{{ t('privacy.title') }}</h1>
+  <p class="lead">{{ t('privacy.intro') }}</p>
+
+  <section class="install">
+    <h2>{{ t('privacy.data_title') }}</h2>
+    <ul>
+      <li>{{ t('privacy.data_email') }}</li>
+      <li>{{ t('privacy.data_library') }}</li>
+    </ul>
+    <p>{{ t('privacy.data_none') }}</p>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('privacy.basis_title') }}</h2>
+    <p>{{ t('privacy.basis_text') }}</p>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('privacy.rights_title') }}</h2>
+    <ul>
+      <li>{{ t('privacy.rights_access') }}</li>
+      <li>{{ t('privacy.rights_erase') }}</li>
+    </ul>
+    <p><a class="btn" href="/account">{{ t('account.title') }}</a></p>
+    <p>{{ t('privacy.contact') }}</p>
+  </section>
+</article>
+{% endblock %}

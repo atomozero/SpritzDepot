@@ -26,14 +26,17 @@ window.spritzAuth = (function () {
     var login = document.getElementById("nav-login");
     var logout = document.getElementById("nav-logout");
     var who = document.getElementById("nav-who");
+    var account = document.getElementById("nav-account");
     if (!login || !logout) return;
     if (isLoggedIn()) {
       login.style.display = "none";
       logout.style.display = "";
+      if (account) account.style.display = "";
       if (who) { who.style.display = ""; who.textContent = getEmail() || "loggato"; }
     } else {
       login.style.display = "";
       logout.style.display = "none";
+      if (account) account.style.display = "none";
       if (who) who.style.display = "none";
     }
   }
@@ -42,6 +45,18 @@ window.spritzAuth = (function () {
     var logout = document.getElementById("nav-logout");
     if (logout) logout.onclick = function (e) {
       e.preventDefault();
+      // Real server-side logout: revoke the token, then drop the local copy.
+      // Fire-and-forget; we clear and redirect regardless of the response so the
+      // UI logs out even offline (the token also expires on its own).
+      var t = getToken();
+      if (t) {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", "/auth/logout", true);
+          xhr.setRequestHeader("Authorization", "Bearer " + t);
+          xhr.send();
+        } catch (err) {}
+      }
       clear();
       refreshHeader();
       window.location.href = "/";

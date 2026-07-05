@@ -261,6 +261,12 @@ class TokenOut(BaseModel):
     token_type: str = "bearer"
 
 
+class DeleteAccountBody(BaseModel):
+    # Deleting an account is destructive and irreversible: require the current
+    # password so a leaked/borrowed token alone cannot erase the account.
+    password: str
+
+
 class QueueBody(BaseModel):
     channel: str = "stable"
     arch: Optional[str] = None
@@ -392,6 +398,62 @@ def logout_all(user: User = Depends(current_user),
     session.add(user)
     session.commit()
     return {"status": "all tokens revoked"}
+
+
+# Alias: the header "logout" button posts here. With stateless JWTs there is no
+# per-token blocklist, so a real server-side logout means bumping the version,
+# which is logout-everywhere. We expose it under a plain /auth/logout name so the
+# client can do a genuine server-side revoke (not just drop the local token) with
+# one call, and document that it signs out every device.
+@app.post("/auth/logout")
+def logout(user: User = Depends(current_user),
+           session: Session = Depends(get_session)):
+    """Server-side logout: revoke the current token (and, being stateless-JWT,
+    every other outstanding token for this user). The client also clears its
+    local copy."""
+    user.token_version += 1
+    session.add(user)
+    session.commit()
+    return {"status": "logged out"}
+
+
+@app.get("/auth/me")
+def me(user: User = Depends(current_user),
+       session: Session = Depends(get_session)):
+    """Return everything spritz stores about the caller (GDPR access +
+    portability, arts. 15 & 20). Password hash is deliberately never included."""
+    rows = session.exec(
+        select(InstallState).where(InstallState.user_id == user.id)).all()
+    return {
+        "email": user.email,
+        "created_at": user.created_at.isoformat() + "Z",
+        "is_admin": user.is_admin,
+        "library": [
+            {"cicheto_id": r.cicheto_id, "channel": r.channel, "arch": r.arch,
+             "state": r.state}
+            for r in rows
+        ],
+    }
+
+
+@app.post("/auth/delete-account")
+@limiter.limit("5/minute")
+def delete_account(request: Request, body: DeleteAccountBody,
+                   user: User = Depends(current_user),
+                   session: Session = Depends(get_session)):
+    """Erase the account and all personal data tied to it (GDPR right to erasure,
+    art. 17): the user row and every library entry. DownloadEvent rows carry no
+    user id, so nothing there identifies the account. Requires the password, so a
+    stolen token alone cannot trigger deletion. Irreversible."""
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(401, "Wrong password")
+    # Delete the library rows first (they reference the user), then the user.
+    for row in session.exec(
+            select(InstallState).where(InstallState.user_id == user.id)).all():
+        session.delete(row)
+    session.delete(user)
+    session.commit()
+    return {"status": "account deleted"}
 
 
 # ---------- public catalog ----------
@@ -1416,6 +1478,20 @@ def library_page(request: Request):
     """'My apps' page: the user pastes their token; JS fetches /library and
     renders the list. Reuses the existing JWT auth (no cookies)."""
     return render(request, "library.html", {})
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request):
+    """Privacy notice (GDPR arts. 13-14): what data spritz stores, the legal
+    basis, retention, and how to exercise access / erasure. Static, translated."""
+    return render(request, "privacy.html", {})
+
+
+@app.get("/account", response_class=HTMLResponse)
+def account_page(request: Request):
+    """'My data' page: the JS uses the stored token to fetch /auth/me (access +
+    export) and to POST /auth/delete-account (erasure). Reuses the JWT auth."""
+    return render(request, "account.html", {})
 
 
 @app.get("/publish", response_class=HTMLResponse)
