@@ -29,6 +29,17 @@ Run the end-to-end test (no network, in-process):
 python test_flow.py
 ```
 
+### Database migrations
+
+A fresh dev run needs nothing: startup calls `create_all`, which creates any
+missing tables. For an EXISTING database (a schema created by an older version,
+or a Postgres prod deploy), use alembic, the single source of truth for schema
+changes; `create_all` does not ALTER existing tables:
+
+```bash
+alembic upgrade head
+```
+
 ### Optional: a GitHub token for ombra
 
 The ombra channel (an app that follows its author's latest GitHub release) and
