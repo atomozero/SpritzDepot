@@ -51,9 +51,14 @@ Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
   repo HaikuDepot, elenco con esito dell'ultimo crawl. La pagina è visibile ma
   inerte senza token; ogni azione è verificata dal server.
 - **Canale ombra (segue l'autore).** Per i canali `github-latest`, spritz
-  risolve l'ultima release GitHub dell'autore al volo: trova gli asset .hpkg per
-  arch col pattern del cichéto e ne restituisce gli URL. Non costruisce
-  pacchetti e non pre-calcola l'hash (lo verifica il client al download).
+  risolve l'ultima release GitHub dell'autore: trova gli asset .hpkg per arch col
+  pattern del cichéto e ne restituisce gli URL. Non costruisce pacchetti e non
+  pre-calcola l'hash (lo verifica il client al download). Un crawler
+  (`crawl_ombra.py`, oppure `POST /admin/crawl-ombra`) prefetcha la risoluzione
+  in una cache (tabella `ombra_snapshots`): i percorsi di lettura servono dallo
+  snapshot quando è fresco e cadono sulla risoluzione live (aggiornando lo
+  snapshot) solo se manca o è scaduto, così non serve colpire GitHub a ogni
+  richiesta. `SPRITZ_GITHUB_TOKEN` alza il rate limit anonimo.
 - **Canale hpkr-repo (repo di terze parti).** Per un repository Haiku di terze
   parti (NON HaikuPorts: BeSly, Fat Elk, il server dell'autore), spritz legge il
   catalogo HPKR (`hpkr.py`, parser in puro Python verificato contro l'output di
@@ -161,11 +166,10 @@ sample-bacaro/   cichéto d'esempio (Genio)
 ## Prossimi passi (non in v1)
 
 1. **Demone Haiku** che consuma `/library/pending` (chiude il cerchio Play Store).
-2. **Crawler GitHub release** per i canali `ombra` (github-latest + pattern match).
-3. **Tier di fiducia, firma manifest, transparency log** (fuori dal cichéto,
+2. **Tier di fiducia, firma manifest, transparency log** (fuori dal cichéto,
    asserzioni firmate dell'indice).
-4. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
-5. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
+3. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
+4. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
 
 Da verificare su Haiku reale (non in WSL): rendering del frontend in WebPositive,
 il probe del client nativo e lo schema `spritz://`, e l'aggiunta del repo-proxy
