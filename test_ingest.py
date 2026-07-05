@@ -10,13 +10,20 @@ os.environ.setdefault("SPRITZ_ENV", "dev")
 os.environ.setdefault("SPRITZ_SECRET", "x")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
-from app.db import init_db, engine
-from sqlmodel import Session, select
-from app.models import CichetoRow
-from app.ingest import ingest_directory, list_bacari
+# Use a throwaway DB, NOT the real catalog. This test does a delete-all "clean
+# slate" below; without the guard it would wipe spritz.db (the catalog the
+# project explicitly protects).
+import test_db_guard  # noqa: E402
+test_db_guard.use_throwaway_db("test_ingest")
 
+from app.db import init_db, engine  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
+from app.models import CichetoRow  # noqa: E402
+from app.ingest import ingest_directory, list_bacari  # noqa: E402
+
+test_db_guard.assert_safe()  # never proceed against the real catalog
 init_db()
-# clean slate
+# clean slate (safe: this is the throwaway DB)
 with Session(engine) as s:
     for r in s.exec(select(CichetoRow)).all():
         s.delete(r)
