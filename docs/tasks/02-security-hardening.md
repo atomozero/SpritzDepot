@@ -28,7 +28,7 @@ nice-to-have.
 
 ## Should fix soon
 
-- [x] **Password policy.** Minimum length 8 (`MIN_PASSWORD_LENGTH`), enforced at
+- [x] **Password policy.** Minimum length 12 (`MIN_PASSWORD_LENGTH`), enforced at
       register and change-password via Pydantic (422 on violation). bcrypt's
       72-byte truncation kept.
 - [x] **Token lifetime + revocation.** Access token TTL cut to 2h. Revocation

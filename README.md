@@ -176,9 +176,12 @@ in HaikuDepot.
 - **`/ingest` è admin-only** (`X-Admin-Token`); chiuso se il token non è
   configurato. La chiave JWT e il token admin vengono dall'ambiente, e in
   `prod` l'app rifiuta di partire senza (vedi Variabili d'ambiente).
-- **Auth**: password min 8 caratteri, JWT a vita breve (2h) con revoca via
-  `token_version` (`logout-all`, cambio password). Login con 401 generico (non
-  rivela se l'email esiste). Rate-limit su login/register/ingest.
+- **Auth**: password min 12 caratteri, JWT a vita breve (2h) con revoca via
+  `token_version` (`logout`, `logout-all`, cambio password, cancellazione
+  account). Il logout dal browser fa una revoca lato server (non solo la pulizia
+  del token locale). Login con 401 generico (non rivela se l'email esiste, e la
+  via "email sconosciuta" paga comunque un bcrypt per non essere distinguibile a
+  tempo). Rate-limit su login/register/ingest.
 - **Ingest**: URL git validato (https; locale solo in dev), clone con timeout e
   cap su dimensione e numero file.
 - **Repo-proxy**: SSRF guard sugli URL autore (in prod solo https, no indirizzi
@@ -188,3 +191,23 @@ in HaikuDepot.
   e logga l'hash visto (trade-off accettabile per i soli nightly).
 - Trust tier e prezzo **non** stanno nel cichéto (file editabile nel repo git):
   vanno nell'indice firmato, così un fork non si auto-promuove.
+
+## Privacy e titolare del trattamento
+
+Il titolare del trattamento dei dati è **Andrea Bernardi**
+(andrea@studiobernardi.eu).
+
+spritz raccoglie il minimo: email e password (hash bcrypt) per l'accesso, più la
+lista delle app che aggiungi alla libreria. Nessun cookie di tracciamento,
+nessuna profilazione; le statistiche di download sono anonime (nessun id utente,
+nessun IP) e l'IP è usato solo in memoria dal rate-limiter, mai memorizzato. La
+base giuridica è l'esecuzione del servizio (art. 6.1.b GDPR) e i dati restano
+finché l'account è attivo.
+
+L'utente può esercitare i propri diritti dall'interfaccia:
+
+- `/privacy` mostra l'informativa (tradotta in tutte le lingue supportate).
+- `/account` ("I miei dati"): esporta i propri dati in JSON (accesso e
+  portabilità, artt. 15 e 20) via `GET /auth/me`, o elimina definitivamente
+  account e libreria (diritto all'oblio, art. 17) via `POST /auth/delete-account`
+  (richiede la password).
