@@ -22,8 +22,10 @@ ALGORITHM = "HS256"
 # Pair with revocation (token_version) for explicit invalidation.
 TOKEN_TTL_MINUTES = 60 * 2  # 2 hours
 
-# Minimum password length enforced at register / change time.
-MIN_PASSWORD_LENGTH = 8
+# Minimum password length enforced at register / change time. 12 is the modern
+# floor: with a public registration and only a per-IP rate limit, length is the
+# main brute-force defense.
+MIN_PASSWORD_LENGTH = 12
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 

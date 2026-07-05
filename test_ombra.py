@@ -144,7 +144,7 @@ try:
 
     # /library/pending must resolve ombra live too (one poll, no extra call).
     tok = c.post("/auth/register",
-                 json={"email": "ombra@x.io", "password": "longenough1"}).json()["access_token"]
+                 json={"email": "ombra@x.io", "password": "longenoughpass1"}).json()["access_token"]
     auth = {"Authorization": f"Bearer {tok}"}
     q = c.post("/library/org.haiku.genio",
                json={"channel": "ombra", "arch": "x86_64"}, headers=auth)

@@ -75,7 +75,7 @@ assert short.status_code == 422, short.text  # pydantic min_length -> 422
 
 # --- token revocation: logout-all invalidates the existing token ---
 reg = c.post("/auth/register",
-             json={"email": "rev@x.io", "password": "longenough1"})
+             json={"email": "rev@x.io", "password": "longenoughpass1"})
 assert reg.status_code == 200, reg.text
 tok = reg.json()["access_token"]
 auth = {"Authorization": f"Bearer {tok}"}
@@ -112,15 +112,15 @@ print("login timing         -> ok (unknown email still pays bcrypt)")
 
 # --- change-password also revokes, and verifies the old password ---
 reg2 = c.post("/auth/register",
-              json={"email": "cp@x.io", "password": "longenough1"})
+              json={"email": "cp@x.io", "password": "longenoughpass1"})
 tok2 = reg2.json()["access_token"]
 auth2 = {"Authorization": f"Bearer {tok2}"}
 wrongold = c.post("/auth/change-password",
-                  json={"old_password": "nope12345", "new_password": "newpass123"},
+                  json={"old_password": "nope12345", "new_password": "newpass123456"},
                   headers=auth2)
 assert wrongold.status_code == 401, wrongold.text
 cp = c.post("/auth/change-password",
-            json={"old_password": "longenough1", "new_password": "newpass123"},
+            json={"old_password": "longenoughpass1", "new_password": "newpass123456"},
             headers=auth2)
 assert cp.status_code == 200, cp.text
 # old token revoked, new token from the response works
@@ -131,7 +131,7 @@ print("change-password     -> revokes old, issues working new token")
 
 # --- rate limiting: hammer /auth/login past its 10/min budget ---
 codes = [c.post("/auth/login",
-                json={"email": "nobody@x.io", "password": "whatever1"}).status_code
+                json={"email": "nobody@x.io", "password": "whateverpass12"}).status_code
          for _ in range(15)]
 print("login burst codes   ->", f"{codes.count(401)}x401 {codes.count(429)}x429")
 assert 429 in codes, "rate limit should kick in (expected some 429)"

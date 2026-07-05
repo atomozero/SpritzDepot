@@ -132,7 +132,7 @@ form = {"id": "org.test.pub", "name": "Pub", "summary": "test",
         "version": "1.0", "haikuports": "pub"}
 assert c.post("/publish", json=form).status_code == 401, "publish must require auth"
 _tok = c.post("/auth/register",
-              json={"email": "pubtest@x.io", "password": "longenough1"}).json()["access_token"]
+              json={"email": "pubtest@x.io", "password": "longenoughpass1"}).json()["access_token"]
 form_icon = dict(form, icon="https://example.org/icon.png")
 gen = c.post("/publish", json=form_icon, headers={"Authorization": f"Bearer {_tok}"})
 assert gen.status_code == 200, gen.text
@@ -161,7 +161,7 @@ def _png():
     return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
 _png_bytes = _png()
 _ut = c.post("/auth/register",
-             json={"email": "up@x.io", "password": "longenough1"}).json()["access_token"]
+             json={"email": "up@x.io", "password": "longenoughpass1"}).json()["access_token"]
 _ua = {"Authorization": f"Bearer {_ut}"}
 assert c.post("/upload/image?kind=icon",
               files={"file": ("i.png", _png_bytes, "image/png")}).status_code == 401
@@ -182,7 +182,7 @@ lp = c.get("/library-page")
 assert lp.status_code == 200 and 'id="lib-list"' in lp.text
 assert c.get("/static/library.js").status_code == 200
 _lt = c.post("/auth/register",
-             json={"email": "libtest@x.io", "password": "longenough1"}).json()["access_token"]
+             json={"email": "libtest@x.io", "password": "longenoughpass1"}).json()["access_token"]
 _la = {"Authorization": f"Bearer {_lt}"}
 assert c.get("/library", headers=_la).json() == [], "new user library is empty"
 c.post("/library/org.haiku.genio", json={"channel": "stable", "arch": "x86_64"},

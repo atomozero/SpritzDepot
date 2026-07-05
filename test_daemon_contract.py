@@ -44,7 +44,7 @@ with Session(engine) as s:
 
 c = TestClient(app)
 tok = c.post("/auth/register",
-             json={"email": "d@x.io", "password": "longenough1"}).json()["access_token"]
+             json={"email": "d@x.io", "password": "longenoughpass1"}).json()["access_token"]
 auth = {"Authorization": f"Bearer {tok}"}
 
 

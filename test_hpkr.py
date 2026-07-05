@@ -134,7 +134,7 @@ try:
     # /library/pending resolves hpkr-repo live too (not just ombra), so the
     # daemon gets the real download URL in one poll.
     ut = c.post("/auth/register",
-                json={"email": "hpkruser@x.io", "password": "longenough1"}).json()["access_token"]
+                json={"email": "hpkruser@x.io", "password": "longenoughpass1"}).json()["access_token"]
     uauth = {"Authorization": f"Bearer {ut}"}
     c.post("/library/repo.tap.helloapp", json={"channel": "stable", "arch": "x86_64"},
            headers=uauth)

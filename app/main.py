@@ -1404,7 +1404,7 @@ def admin_page(request: Request):
 def login_page(request: Request):
     """Browser login/registration. The form calls /auth/login or
     /auth/register and stores the JWT client-side (see static/auth.js)."""
-    return render(request, "login.html", {})
+    return render(request, "login.html", {"min_password": MIN_PASSWORD_LENGTH})
 
 
 @app.get("/library-page", response_class=HTMLResponse)
@@ -1495,9 +1495,22 @@ async def upload_image(request: Request, kind: str = Query("screenshot"),
     just a place to host the image if the author has nowhere else."""
     max_bytes = (config.MAX_ICON_BYTES if kind == "icon"
                  else config.MAX_SCREENSHOT_BYTES)
-    data = await file.read()
+    # Reject an oversized upload BEFORE buffering it all in memory. First trust
+    # the declared Content-Length as a cheap early-out, then read in chunks with
+    # a hard cap so a lying/absent length can't stream gigabytes into RAM.
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > max_bytes:
+        raise HTTPException(413, f"image too large (> {max_bytes} bytes)")
+    data = bytearray()
+    while True:
+        chunk = await file.read(1 << 16)
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > max_bytes:
+            raise HTTPException(413, f"image too large (> {max_bytes} bytes)")
     try:
-        name = uploads.save_image(data, max_bytes)
+        name = uploads.save_image(bytes(data), max_bytes)
     except uploads.UploadError as e:
         raise HTTPException(400, str(e))
     url = f"{config.PUBLIC_BASE_URL.rstrip('/')}/assets/{name}"

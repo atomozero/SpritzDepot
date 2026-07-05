@@ -23,8 +23,8 @@
       <p>
         <label>{{ t('login.password') }}<br>
         <input type="password" name="password" required class="field"
-               autocomplete="current-password" minlength="8"></label>
-        <span class="hint">{{ t('login.min_chars') }}</span>
+               autocomplete="current-password" minlength="{{ min_password }}"></label>
+        <span class="hint">{{ t('login.min_chars', n=min_password) }}</span>
       </p>
       <p>
         <button type="submit" class="btn" id="btn-login">{{ t('login.title') }}</button>

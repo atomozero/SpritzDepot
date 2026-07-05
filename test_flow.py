@@ -17,7 +17,7 @@ print("\n[daemon] resolve stable/x86_64:")
 print(" ", c.get("/resolve/org.haiku.genio?channel=stable&arch=x86_64").json())
 
 print("\n[auth] register:")
-tok = c.post("/auth/register", json={"email":"andrea@vepro.it","password":"spritz123"}).json()["access_token"]
+tok = c.post("/auth/register", json={"email":"andrea@vepro.it","password":"spritz123456"}).json()["access_token"]
 print("  token:", tok[:24], "...")
 H = {"Authorization": f"Bearer {tok}"}
 
@@ -34,5 +34,5 @@ print("\n[web] my library (state should be installed):")
 print(" ", c.get("/library", headers=H).json())
 
 print("\n[auth] login round-trip:")
-r = c.post("/auth/login", json={"email":"andrea@vepro.it","password":"spritz123"})
+r = c.post("/auth/login", json={"email":"andrea@vepro.it","password":"spritz123456"})
 print("  login status:", r.status_code, "| wrong pw:", c.post("/auth/login", json={"email":"andrea@vepro.it","password":"x"}).status_code)

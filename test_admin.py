@@ -75,13 +75,13 @@ print("delete bàcaro      -> ok (cichéti + record removed)")
 
 # --- first user becomes admin; admin login passes the gate (no token) ---
 admin_tok = c.post("/auth/register",
-                   json={"email": "boss@x.io", "password": "longenough1"}).json()["access_token"]
+                   json={"email": "boss@x.io", "password": "longenoughpass1"}).json()["access_token"]
 admin_auth = {"Authorization": f"Bearer {admin_tok}"}
 # the admin user reaches an admin-only endpoint WITHOUT X-Admin-Token
 assert c.get("/admin/bacari", headers=admin_auth).status_code == 200, "admin user gate"
 # a second user is NOT admin and is rejected on the same endpoint
 normal_tok = c.post("/auth/register",
-                    json={"email": "normal@x.io", "password": "longenough1"}).json()["access_token"]
+                    json={"email": "normal@x.io", "password": "longenoughpass1"}).json()["access_token"]
 assert c.get("/admin/bacari",
              headers={"Authorization": f"Bearer {normal_tok}"}).status_code == 401, \
     "non-admin user must be rejected"
@@ -106,7 +106,7 @@ try:
         _s.exec(_delete(_User))
         _s.commit()
     tok = c.post("/auth/register",
-                 json={"email": "first@x.io", "password": "longenough1"}).json()["access_token"]
+                 json={"email": "first@x.io", "password": "longenoughpass1"}).json()["access_token"]
     r = c.get("/admin/bacari", headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 401, \
         f"bootstrap-off: first user must not be admin, got {r.status_code}"

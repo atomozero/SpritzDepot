@@ -32,7 +32,7 @@ print("stats shape        -> ok")
 # counters move with a user + a queued install
 before = c.get("/stats").json()
 tok = c.post("/auth/register",
-             json={"email": "ops@x.io", "password": "longenough1"}).json()["access_token"]
+             json={"email": "ops@x.io", "password": "longenoughpass1"}).json()["access_token"]
 c.post("/library/org.haiku.genio", json={"channel": "stable", "arch": "x86_64"},
        headers={"Authorization": f"Bearer {tok}"})
 after = c.get("/stats").json()
