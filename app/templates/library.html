@@ -4,20 +4,17 @@
 {% block content %}
 <article class="app-detail">
   <h1>{{ t('nav.my_apps') }}</h1>
-  <p class="lead">
-    Le app che hai messo in libreria. Quando il client spritz nativo e' attivo,
-    le installa e ne aggiorna lo stato (in coda, installata).
-  </p>
+  <p class="lead">{{ t('lib.page_lead') }}</p>
 
   <section class="install">
-    <h2>Accedi</h2>
+    <h2>{{ t('lib.login_heading') }}</h2>
     <p class="hint">
-      Se hai fatto <a href="/login">login</a>, la tua libreria si carica da sola.
+      <a href="/login">{{ t('nav.login') }}</a> &middot; {{ t('lib.login_hint') }}
     </p>
     <p>
-      <input type="text" id="token" placeholder="token di accesso"
+      <input type="text" id="token" placeholder="{{ t('lib.token_placeholder') }}"
              class="field" style="max-width:520px;">
-      <button id="load" class="btn">Mostra le mie app</button>
+      <button id="load" class="btn">{{ t('lib.show_button') }}</button>
     </p>
   </section>
 
@@ -28,10 +25,7 @@
            data-s-removed="{{ t('lib.state.removed') }}">
     <h2>{{ t('nav.my_apps') }}</h2>
     <ul class="app-list" id="lib-list"></ul>
-    <p class="empty" id="lib-empty" style="display:none;">
-      La tua libreria e' vuota. Sfoglia il <a href="/">catalogo</a> e aggiungi
-      un'app.
-    </p>
+    <p class="empty" id="lib-empty" style="display:none;">{{ t('lib.empty') }}</p>
   </section>
 </article>
 

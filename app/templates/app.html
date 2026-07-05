@@ -91,7 +91,8 @@
     <h2>{{ t('app.install') }}</h2>
     {% for channel_name, ch in app.channels.items() %}
     <div class="channel" data-channel="{{ channel_name }}"
-         data-cicheto="{{ app.id }}">
+         data-cicheto="{{ app.id }}"
+         data-deeplink-label="{{ t('app.install_oneclick') }}">
       <h3>
         {{ t('app.channel') }} {{ channel_name }}
         {% if ch.version %}<span class="version">v{{ ch.version }}</span>{% endif %}

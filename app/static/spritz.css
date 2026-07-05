@@ -210,7 +210,12 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .featured-cta { margin-left: 22px; flex-shrink: 0; }
 
 /* ---------- Pager ---------- */
-.pager { margin: 8px 0 18px; display: flex; align-items: center; gap: 12px; }
+/* flex `gap` only shipped in WebKit 14.1, newer than WebPositive's fork, so it
+   collapses to zero spacing there. Use per-child margins instead (the rest of
+   this file already does), keeping the "no modern-only CSS" promise. */
+.pager { margin: 8px 0 18px; display: flex; align-items: center; }
+.pager > * { margin-right: 12px; }
+.pager > *:last-child { margin-right: 0; }
 .pager-info { color: #64748b; font-size: 14px; }
 
 /* ---------- Categories page ---------- */
@@ -222,7 +227,10 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 /* ---------- App detail ---------- */
 .app-detail { background: #ffffff; border: 1px solid #e4e9f1; border-radius: 14px;
   padding: 24px 26px; margin-top: 24px; box-shadow: 0 2px 8px rgba(15,23,42,0.05); }
-.app-detail-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.app-detail-head { display: flex; align-items: center; flex-wrap: wrap; }
+/* per-child margins instead of flex gap (WebPositive); icon and cta set their
+   own below, so only the titles column needs a right margin for spacing. */
+.app-detail-titles { margin-right: 12px; }
 .app-detail-head .app-icon { margin-right: 16px; border-radius: 16px;
   box-shadow: 0 2px 6px rgba(15,23,42,0.18); flex-shrink: 0; }
 .app-detail-head h1 { margin: 0; font-size: 27px; color: #0f172a; }
@@ -235,10 +243,12 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .app-detail-cta .btn { margin: 0; }
 .app-detail-cta .hint { display: block; margin-top: 6px; }
 
-/* screenshots as a horizontal strip that scrolls, not a tall stack */
-.screenshot-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
-.screenshot-strip .screenshot { height: 260px; width: auto; max-width: none; margin: 0;
-  flex: 0 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+/* screenshots as a horizontal strip that scrolls, not a tall stack.
+   margin-right on each shot instead of flex gap (WebPositive). */
+.screenshot-strip { display: flex; overflow-x: auto; padding-bottom: 6px; }
+.screenshot-strip .screenshot { height: 260px; width: auto; max-width: none;
+  margin: 0 12px 0 0; flex: 0 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+.screenshot-strip .screenshot:last-child { margin-right: 0; }
 
 .bridge-note {
   background: #ecfdf5; border: 1px solid #a7f3d0; border-left: 4px solid #10b981;

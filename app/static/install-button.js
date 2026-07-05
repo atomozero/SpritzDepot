@@ -30,7 +30,10 @@
       link.className = "btn btn-deeplink";
       link.href = "spritz://install/" + encodeURIComponent(cicheto) +
         "?channel=" + encodeURIComponent(channel);
-      link.textContent = "Installa con un clic (client spritz)";
+      // Label is translated in the template and passed via data-deeplink-label,
+      // with an English fallback if the attribute is missing.
+      link.textContent = ch.getAttribute("data-deeplink-label") ||
+        "Install with one click (spritz client)";
       // Put the one-click action first.
       actions.insertBefore(link, actions.firstChild);
     }
