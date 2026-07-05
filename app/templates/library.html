@@ -22,7 +22,11 @@
            data-s-remove="{{ t('lib.remove') }}"
            data-s-pending="{{ t('lib.state.pending') }}"
            data-s-installed="{{ t('lib.state.installed') }}"
-           data-s-removed="{{ t('lib.state.removed') }}">
+           data-s-removed="{{ t('lib.state.removed') }}"
+           data-msg-login="{{ t('lib.login_first') }}"
+           data-msg-badtoken="{{ t('lib.bad_token') }}"
+           data-msg-expired="{{ t('lib.session_expired') }}"
+           data-msg-error="{{ t('lib.error') }}">
     <h2>{{ t('nav.my_apps') }}</h2>
     <ul class="app-list" id="lib-list"></ul>
     <p class="empty" id="lib-empty" style="display:none;">{{ t('lib.empty') }}</p>

@@ -7,7 +7,15 @@
   <p class="lead">{{ t('login.lead') }}</p>
 
   <section class="install">
-    <form id="auth-form">
+    <form id="auth-form"
+          data-msg-required="{{ t('login.required') }}"
+          data-msg-wait="{{ t('login.wait') }}"
+          data-msg-done="{{ t('login.done') }}"
+          data-msg-wrong="{{ t('login.wrong') }}"
+          data-msg-exists="{{ t('login.exists') }}"
+          data-msg-short="{{ t('login.short') }}"
+          data-msg-throttled="{{ t('login.throttled') }}"
+          data-msg-error="{{ t('login.error') }}">
       <p>
         <label>{{ t('login.email') }}<br>
         <input type="email" name="email" required class="field" autocomplete="username"></label>

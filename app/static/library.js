@@ -14,6 +14,10 @@
     removed: (R && R.getAttribute("data-s-removed")) || "rimossa"
   };
   var REMOVE_LABEL = (R && R.getAttribute("data-s-remove")) || "Rimuovi";
+  // Translated alert messages from data-* on #result (English fallback).
+  function M(name, fallback) {
+    return (R && R.getAttribute("data-msg-" + name)) || fallback;
+  }
 
   // Prefill the token field from the stored login, if any.
   if (window.spritzAuth && window.spritzAuth.getToken()) {
@@ -23,7 +27,7 @@
   btn.onclick = function () {
     var token = (document.getElementById("token").value || "").trim() ||
                 (window.spritzAuth ? window.spritzAuth.getToken() : "");
-    if (!token) { alert("Accedi prima (link Accedi in alto)."); return; }
+    if (!token) { alert(M("login", "Log in first (link at the top).")); return; }
 
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/library", true);
@@ -33,9 +37,9 @@
       if (xhr.status === 200) {
         render(JSON.parse(xhr.responseText));
       } else if (xhr.status === 401) {
-        alert("Token non valido o scaduto.");
+        alert(M("badtoken", "Invalid or expired token."));
       } else {
-        alert("Errore (" + xhr.status + ").");
+        alert(M("error", "Error") + " (" + xhr.status + ").");
       }
     };
     xhr.send();
@@ -106,7 +110,7 @@
       if (xhr.status >= 200 && xhr.status < 300) {
         btn.click();  // reload the list
       } else if (xhr.status === 401) {
-        alert("Sessione scaduta, riaccedi.");
+        alert(M("expired", "Session expired, log in again."));
       }
     };
     xhr.send();
