@@ -4,6 +4,19 @@
   "use strict";
   if (!document.getElementById("ing-btn")) return;
 
+  // Translated messages from data-* on #js-msgs (English fallback). Optional
+  // {placeholders} in the string are filled from the vars object.
+  var MSGS = document.getElementById("js-msgs");
+  function M(name, fallback, vars) {
+    var s = (MSGS && MSGS.getAttribute("data-m-" + name)) || fallback;
+    if (vars) {
+      for (var k in vars) {
+        if (vars.hasOwnProperty(k)) s = s.replace("{" + k + "}", vars[k]);
+      }
+    }
+    return s;
+  }
+
   function token() {
     return (document.getElementById("admin-token").value || "").trim();
   }
@@ -13,7 +26,7 @@
   function need() {
     // Either an admin token in the field, or a logged-in (admin) user.
     if (!token() && !userToken()) {
-      alert("Accedi come admin, oppure incolla il token admin.");
+      alert(M("need", "Log in as admin, or paste the admin token."));
       return false;
     }
     return true;
@@ -31,11 +44,11 @@
       if (xhr.status >= 200 && xhr.status < 300) {
         onok(xhr.responseText ? JSON.parse(xhr.responseText) : null);
       } else if (xhr.status === 401) {
-        alert("Token admin non valido.");
+        alert(M("badtoken", "Invalid admin token."));
       } else if (xhr.status === 503) {
-        alert("Endpoint admin disabilitato (SPRITZ_ADMIN_TOKEN non configurato).");
+        alert(M("disabled", "Admin endpoint disabled (SPRITZ_ADMIN_TOKEN not set)."));
       } else {
-        alert("Errore (" + xhr.status + "): " + (xhr.responseText || ""));
+        alert(M("error", "Error") + " (" + xhr.status + "): " + (xhr.responseText || ""));
       }
       // Clear any "in progress" status lines on a non-2xx outcome.
       if (xhr.status < 200 || xhr.status >= 300) {
@@ -50,10 +63,10 @@
 
   function ingest(url, slug, statusEl, resultEl) {
     if (!need()) return;
-    if (!url || !slug) { alert("URL e slug sono obbligatori."); return; }
-    statusEl.textContent = "Ingest in corso...";
+    if (!url || !slug) { alert(M("needurlslug", "URL and slug are required.")); return; }
+    statusEl.textContent = M("ingesting", "Ingesting...");
     req("POST", "/ingest", function (data) {
-      statusEl.textContent = "Fatto.";
+      statusEl.textContent = M("done", "Done.");
       if (resultEl) {
         resultEl.style.display = "block";
         resultEl.textContent = JSON.stringify(data, null, 2);
@@ -73,14 +86,15 @@
     if (!need()) return;
     var url = document.getElementById("imp-url").value.trim();
     var slug = document.getElementById("imp-slug").value.trim();
-    if (!url || !slug) { alert("URL e slug sono obbligatori."); return; }
+    if (!url || !slug) { alert(M("needurlslug", "URL and slug are required.")); return; }
     var statusEl = document.getElementById("imp-status");
     var resultEl = document.getElementById("imp-result");
-    statusEl.textContent = "Import in corso (puo' richiedere qualche secondo)...";
+    statusEl.textContent = M("importing", "Importing (may take a few seconds)...");
     req("POST", "/repo/import-hpkr", function (data) {
       var n = data.ingested ? data.ingested.length : 0;
       var found = data.found_in_catalog != null ? data.found_in_catalog : n;
-      statusEl.textContent = "Importati " + n + " di " + found + " pacchetti.";
+      statusEl.textContent = M("imported", "Imported {n} of {found} packages.",
+                               { n: n, found: found });
       resultEl.style.display = "block";
       resultEl.textContent = JSON.stringify(data, null, 2);
       loadBacari();
@@ -90,10 +104,12 @@
   document.getElementById("rebuild-btn").onclick = function () {
     if (!need()) return;
     var s = document.getElementById("admin-status");
-    s.textContent = "Rebuild in corso...";
+    s.textContent = M("rebuilding", "Rebuilding...");
     req("POST", "/repo/build", function (data) {
-      s.textContent = "Rebuild: " + (data.built ? data.built.length : 0) +
-        " repo, " + (data.errors ? data.errors.length : 0) + " errori.";
+      s.textContent = M("rebuilt", "Rebuild: {n} repos, {e} errors.", {
+        n: (data.built ? data.built.length : 0),
+        e: (data.errors ? data.errors.length : 0)
+      });
     });
   };
 
@@ -137,32 +153,33 @@
     var td = document.createElement("td");
     var btn = document.createElement("button");
     btn.className = "btn btn-fallback";
-    btn.textContent = "Ri-crawl";
+    btn.textContent = M("recrawl", "Re-crawl");
     btn.onclick = function () {
       ingest(r.git_url, r.slug, document.getElementById("admin-status"), null);
     };
-    if (!r.git_url) { btn.disabled = true; btn.title = "URL non memorizzato"; }
+    if (!r.git_url) { btn.disabled = true; btn.title = M("nourl", "URL not stored"); }
     td.appendChild(btn);
 
     var del = document.createElement("button");
     del.className = "btn btn-danger";
-    del.textContent = "Elimina";
+    del.textContent = M("delete", "Delete");
     del.style.marginLeft = "6px";
     del.onclick = function () {
-      if (!confirm("Eliminare il bacaro '" + r.slug + "' e tutte le sue app dal "
-                   + "catalogo? Il repo originale non viene toccato.")) return;
+      if (!confirm(M("confirmdelete", "Delete bacaro '{slug}' and all its apps "
+                   + "from the catalog?", { slug: r.slug }) + " "
+                   + M("confirmdeletenote", "The original repo is untouched."))) return;
       var s = document.getElementById("admin-status");
-      s.textContent = "Eliminazione...";
+      s.textContent = M("deleting", "Deleting...");
       req("DELETE", "/bacari/" + encodeURIComponent(r.slug), function (data) {
-        s.textContent = "Eliminato '" + data.deleted_bacaro + "' ("
-          + data.removed_cicheti + " app rimosse).";
+        s.textContent = M("deleted", "Deleted '{slug}' ({n} apps removed).",
+          { slug: data.deleted_bacaro, n: data.removed_cicheti });
         loadBacari();
       });
     };
     td.appendChild(del);
     tr.appendChild(td);
     if (r.last_error) {
-      tr.title = "Ultimo errore: " + r.last_error;
+      tr.title = M("lasterror", "Last error:") + " " + r.last_error;
     }
     return tr;
   }

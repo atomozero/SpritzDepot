@@ -7,6 +7,12 @@
   var form = document.getElementById("publish-form");
   if (!form) return;
 
+  // Translated messages from data-* on #js-msgs (English fallback).
+  var MSGS = document.getElementById("js-msgs");
+  function M(name, fallback) {
+    return (MSGS && MSGS.getAttribute("data-m-" + name)) || fallback;
+  }
+
   // Prefill the token from the stored login, if any (no manual paste needed).
   if (window.spritzAuth && window.spritzAuth.getToken()) {
     document.getElementById("token").value = window.spritzAuth.getToken();
@@ -15,13 +21,13 @@
   // --- image upload helpers (convenience: returns a spritz-served URL) ---
   function uploadImage(kind, fileInput, statusEl, onUrl) {
     var token = (document.getElementById("token").value || "").trim();
-    if (!token) { alert("Incolla prima il tuo token di accesso (punto 1)."); return; }
+    if (!token) { alert(M("needtoken", "Paste your access token first (step 1).")); return; }
     var f = fileInput.files && fileInput.files[0];
-    if (!f) { alert("Scegli prima un file immagine."); return; }
+    if (!f) { alert(M("needfile", "Choose an image file first.")); return; }
 
     var fd = new FormData();
     fd.append("file", f);
-    statusEl.textContent = "Caricamento...";
+    statusEl.textContent = M("uploading", "Uploading...");
 
     var xhr = new XMLHttpRequest();
     xhr.open("POST", "/upload/image?kind=" + encodeURIComponent(kind), true);
@@ -30,14 +36,15 @@
       if (xhr.readyState !== 4) return;
       if (xhr.status === 200) {
         var url = JSON.parse(xhr.responseText).url;
-        statusEl.textContent = "Caricata: " + url;
+        statusEl.textContent = M("uploaded", "Uploaded:") + " " + url;
         onUrl(url);
       } else if (xhr.status === 401) {
         statusEl.textContent = "";
-        alert("Token non valido o scaduto.");
+        alert(M("badtoken", "Invalid or expired token."));
       } else {
         statusEl.textContent = "";
-        alert("Upload fallito (" + xhr.status + "): " + extractDetail(xhr.responseText));
+        alert(M("uploadfailed", "Upload failed") + " (" + xhr.status + "): "
+              + extractDetail(xhr.responseText));
       }
     };
     xhr.send(fd);
@@ -65,7 +72,7 @@
 
     var token = (document.getElementById("token").value || "").trim();
     if (!token) {
-      alert("Incolla prima il tuo token di accesso (punto 1).");
+      alert(M("needtoken", "Paste your access token first (step 1)."));
       return false;
     }
 
@@ -86,13 +93,13 @@
       if (xhr.status === 200) {
         showResult(xhr.responseText, body.id || "app");
       } else if (xhr.status === 401) {
-        alert("Token non valido o scaduto. Rifai il login e incolla il token.");
+        alert(M("badtokenrelogin", "Invalid or expired token. Log in again and paste the token."));
       } else if (xhr.status === 422) {
-        alert("Cicheto non valido:\n\n" + extractDetail(xhr.responseText));
+        alert(M("badcicheto", "Invalid cicheto:") + "\n\n" + extractDetail(xhr.responseText));
       } else if (xhr.status === 429) {
-        alert("Troppe richieste, riprova tra poco.");
+        alert(M("throttled", "Too many requests, try again shortly."));
       } else {
-        alert("Errore (" + xhr.status + "): " + xhr.responseText);
+        alert(M("error", "Error") + " (" + xhr.status + "): " + xhr.responseText);
       }
     };
     xhr.send(JSON.stringify(body));
