@@ -113,6 +113,20 @@
     });
   };
 
+  var crawlBtn = document.getElementById("crawl-ombra-btn");
+  if (crawlBtn) crawlBtn.onclick = function () {
+    if (!need()) return;
+    var s = document.getElementById("admin-status");
+    s.textContent = M("crawling", "Prefetching ombra...");
+    req("POST", "/admin/crawl-ombra", function (data) {
+      s.textContent = M("crawled", "ombra prefetch: {n} apps, {r} resolved, {e} errors.", {
+        n: (data ? data.total : 0),
+        r: (data ? data.resolved : 0),
+        e: (data ? data.errors : 0)
+      });
+    });
+  };
+
   document.getElementById("refresh-btn").onclick = loadBacari;
 
   function loadBacari() {

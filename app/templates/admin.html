@@ -68,6 +68,7 @@
     <p>
       <button id="refresh-btn" class="btn btn-fallback">Aggiorna elenco</button>
       <button id="rebuild-btn" class="btn btn-fallback">Rebuild repo HaikuDepot</button>
+      <button id="crawl-ombra-btn" class="btn btn-fallback">Prefetch ombra</button>
       <span class="hint" id="admin-status"></span>
     </p>
     <table id="bacari-table" class="admin-table" style="display:none;">
@@ -92,6 +93,8 @@
      data-m-imported="{{ t('adm.imported') }}"
      data-m-rebuilding="{{ t('adm.rebuilding') }}"
      data-m-rebuilt="{{ t('adm.rebuilt') }}"
+     data-m-crawling="{{ t('adm.crawling') }}"
+     data-m-crawled="{{ t('adm.crawled') }}"
      data-m-recrawl="{{ t('adm.recrawl') }}"
      data-m-delete="{{ t('adm.delete') }}"
      data-m-confirmdelete="{{ t('adm.confirm_delete') }}"

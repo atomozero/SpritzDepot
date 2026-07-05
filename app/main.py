@@ -43,7 +43,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
 from . import (cache, config, hds, hpkr, hvif, i18n, netguard, ombra,
-               repo_proxy, uploads, version)
+               ombra_crawler, repo_proxy, uploads, version)
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
@@ -577,13 +577,17 @@ def _cached_version(raw: dict) -> Optional[str]:
 _OMBRA_VERSION_CACHE: dict = {}
 
 
-def _ombra_version(raw: dict) -> Optional[str]:
-    """Best-effort live version of an ombra (github-latest) channel: the tag of
-    the author's newest release, so an ombra copy can join the version compare.
+def _ombra_version(session: Session, cicheto_id: str,
+                   raw: dict) -> Optional[str]:
+    """Best-effort version of an ombra (github-latest) channel: the tag of the
+    author's newest release, so an ombra copy can join the version compare.
 
-    Deliberately defensive: a short timeout, and ANY failure (network, rate
-    limit, no match, bad config) returns None so the app page still renders fast
-    and the compare simply skips this copy rather than blocking or guessing."""
+    Snapshot-first: a fresh OmbraSnapshot answers without any network. Only when
+    it is missing/stale do we do a short live lookup (in-process cached).
+
+    Deliberately defensive: ANY failure (network, rate limit, no match, bad
+    config) returns None so the app page still renders fast and the compare simply
+    skips this copy rather than blocking or guessing."""
     channels = (raw or {}).get("channels") or {}
     ch = channels.get("ombra") if isinstance(channels, dict) else None
     if not isinstance(ch, dict):
@@ -592,6 +596,12 @@ def _ombra_version(raw: dict) -> Optional[str]:
     match = ch.get("match")
     if not repo or not match:
         return None
+
+    # Fresh snapshot: free and authoritative for the badge.
+    snap = ombra_crawler.read_snapshot(session, cicheto_id, raw)
+    if snap is not None:
+        return snap.version
+
     prerelease = bool(ch.get("prerelease", False))
     ckey = (repo, match, prerelease)
     if ckey in _OMBRA_VERSION_CACHE:
@@ -611,11 +621,12 @@ def _ombra_version(raw: dict) -> Optional[str]:
     return version_str
 
 
-def _best_version(raw: dict) -> Optional[str]:
+def _best_version(session: Session, cicheto_id: str,
+                  raw: dict) -> Optional[str]:
     """The version to use for the 'latest' compare: the cached stable/pinned
-    version if present, otherwise the live ombra tag. Cached first because it is
-    free and authoritative for pinned channels; ombra is the live fallback."""
-    return _cached_version(raw) or _ombra_version(raw)
+    version if present, otherwise the ombra tag (snapshot or live). Cached first
+    because it is free and authoritative for pinned channels."""
+    return _cached_version(raw) or _ombra_version(session, cicheto_id, raw)
 
 
 def _also_in_sources(session: Session, row: CichetoRow) -> dict:
@@ -642,11 +653,12 @@ def _also_in_sources(session: Session, row: CichetoRow) -> dict:
     # only for this small group, not the whole catalog. _best_version resolves an
     # ombra tag when there is no cached pinned version.
     sources = [{"id": o.id, "bacaro": o.bacaro,
-                "version": _best_version(o.raw), "newest": False} for o in twins]
+                "version": _best_version(session, o.id, o.raw), "newest": False}
+               for o in twins]
 
     # Include this app in the pool so 'newest' is honest across all copies.
     pool = sources + [{"id": row.id, "bacaro": row.bacaro,
-                       "version": _best_version(row.raw)}]
+                       "version": _best_version(session, row.id, row.raw)}]
     newest_id = _pick_newest([p for p in pool if p["version"]])
     for s in sources:
         s["newest"] = (s["id"] == newest_id)
@@ -821,7 +833,7 @@ def resolve(request: Request, cicheto_id: str,
     notes: list = []
     source = ch.get("source")
     if source == "github-latest":
-        artifacts, version = _resolve_ombra(row.raw, ch, arch, notes)
+        artifacts, version = _resolve_ombra(session, row.id, row.raw, ch, arch, notes)
     elif source == "hpkr-repo":
         # Resolve against a third-party Haiku repository's HPKR catalog.
         repo_url = ch.get("repo_url")
@@ -864,28 +876,47 @@ def resolve(request: Request, cicheto_id: str,
     return out
 
 
-def _resolve_ombra(raw: dict, ch: dict, arch: Optional[str],
+def _resolve_ombra(session: Session, cicheto_id: str, raw: dict, ch: dict,
+                   arch: Optional[str],
                    notes: list) -> tuple[dict, Optional[str]]:
-    """Resolve a github-latest channel to live asset URLs (no sha256)."""
+    """Resolve a github-latest channel to asset URLs (no sha256).
+
+    Snapshot-first: serve a fresh OmbraSnapshot from the DB (no GitHub call) and
+    fall back to a live resolve that refreshes the snapshot only when it is
+    missing or stale, so this is correct even if the crawler never ran."""
     repo = ch.get("repo") or ombra.repo_from_homepage(raw.get("homepage"))
     if not repo:
         raise HTTPException(
             422, "ombra channel needs 'repo' (owner/name) or a github homepage")
-    arches = [arch] if arch else list((ch.get("artifacts") or {}).keys())
-    if not arches:
-        # No arch hint anywhere: ask the client to pass ?arch=.
-        raise HTTPException(400, "specify ?arch= for this ombra channel")
-    try:
-        res = ombra.resolve_github_latest(
-            repo, ch.get("match"), arches, prerelease=ch.get("prerelease", False))
-    except ombra.OmbraError as e:
-        raise HTTPException(502, f"ombra resolve failed: {e}")
-    notes.extend(res.notes)
-    # Shape like pinned artifacts but without sha256 (verified at download).
-    artifacts = {a: {"url": url} for a, url in res.artifacts.items()}
+
+    snap = ombra_crawler.read_snapshot(session, cicheto_id, raw)
+    if snap is not None and snap.artifacts:
+        # Fresh snapshot: use it, no network. `artifacts` is already arch->{url}.
+        artifacts = dict(snap.artifacts)
+        version = snap.version
+    else:
+        # Missing/stale: resolve live and refresh the snapshot for next time.
+        arches = [arch] if arch else list((ch.get("artifacts") or {}).keys())
+        if not arches:
+            raise HTTPException(400, "specify ?arch= for this ombra channel")
+        try:
+            res = ombra.resolve_github_latest(
+                repo, ch.get("match"), arches,
+                prerelease=ch.get("prerelease", False))
+        except ombra.OmbraError as e:
+            raise HTTPException(502, f"ombra resolve failed: {e}")
+        notes.extend(res.notes)
+        artifacts = {a: {"url": url} for a, url in res.artifacts.items()}
+        version = res.version
+        # Best-effort snapshot refresh (never let a cache write break resolve).
+        try:
+            ombra_crawler.resolve_and_snapshot(session, cicheto_id, raw)
+        except Exception:
+            pass
+
     if arch and arch not in artifacts:
         raise HTTPException(404, f"no ombra asset for arch '{arch}'")
-    return artifacts, res.version
+    return artifacts, version
 
 
 # ---------- library (the queue) ----------
@@ -1009,7 +1040,8 @@ def pending(user: User = Depends(current_user),
         # failure leaves empty artifacts + a note.
         if source == "github-latest":
             try:
-                artifacts, version = _resolve_ombra(row.raw, ch, r.arch, notes)
+                artifacts, version = _resolve_ombra(session, row.id, row.raw,
+                                                    ch, r.arch, notes)
                 item["artifacts"] = artifacts
                 item["version"] = version
             except HTTPException as e:
@@ -1325,6 +1357,16 @@ def build_repos(session: Session = Depends(get_session)):
         return _rebuild_all_repos(session)
     except repo_proxy.ToolUnavailable as e:
         raise HTTPException(503, str(e))
+
+
+@app.post("/admin/crawl-ombra", dependencies=[Depends(require_admin)])
+def crawl_ombra_route(session: Session = Depends(get_session)):
+    """Admin: prefetch every ombra (github-latest) app's latest release into the
+    snapshot cache, so /resolve and /library/pending serve from the DB instead of
+    hitting GitHub live. Also runnable headless via crawl_ombra.py (cron/timer)."""
+    result = ombra_crawler.crawl_ombra(session)
+    return {"total": result.total, "resolved": result.resolved,
+            "errors": result.errors}
 
 
 @app.get("/repo/{vendor}/{arch}/current/repo.info", response_class=PlainTextResponse)

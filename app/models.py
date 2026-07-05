@@ -101,6 +101,34 @@ class DownloadEvent(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class OmbraSnapshot(SQLModel, table=True):
+    """Prefetched resolution of an app's ombra (github-latest) channel.
+
+    ombra follows the author's newest GitHub release, so resolving it live means
+    hitting the GitHub API on every /resolve, /library/pending, and app-page view
+    (slow, and rate-limited to 60 req/h without a token). The crawler resolves
+    each ombra app once and stores the result here; the read paths use this
+    snapshot when it is fresh and fall back to a live resolve (refreshing the
+    snapshot) only when it is missing or stale. One row per app.
+
+    `repo`/`match`/`prerelease` mirror the channel config the snapshot was built
+    from, so a re-ingest that changes them invalidates the stale snapshot instead
+    of serving a resolution for the old config. `artifacts` is arch -> url with no
+    sha256 (ombra is verified at download time by the client, by design)."""
+    __tablename__ = "ombra_snapshots"
+
+    cicheto_id: str = Field(primary_key=True)
+    repo: str = ""
+    match: str = ""
+    prerelease: bool = False
+    version: Optional[str] = None
+    artifacts: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    resolved_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    # Last resolve error (rate limit, no matching asset, bad repo), for the admin
+    # page and debugging. None on a clean resolve.
+    error: Optional[str] = None
+
+
 class InstallState(SQLModel, table=True):
     """A user's library entry: the 'Play Store' queue.
 
