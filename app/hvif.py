@@ -27,6 +27,10 @@ from .hpkg_heap import HeapError, decompress_heap
 
 HVIF_MAGIC = b"ncif"
 
+# Hard cap on the hvif2png render: a single icon conversion is sub-second, so a
+# generous ceiling still stops a crafted blob from hanging the worker.
+HVIF2PNG_TIMEOUT = 10
+
 
 class IconError(RuntimeError):
     """Icon could not be extracted/rendered (caller falls back to placeholder)."""
@@ -87,9 +91,14 @@ def _render_png(hvif: bytes, size: int = 64) -> bytes:
         hvif_path = Path(td) / "icon.hvif"
         png_path = Path(td) / "icon.png"
         hvif_path.write_bytes(hvif)
-        proc = subprocess.run(
-            [tool, "-s", str(size), "-i", str(hvif_path), "-o", str(png_path)],
-            env=env, capture_output=True, text=True)
+        try:
+            proc = subprocess.run(
+                [tool, "-s", str(size), "-i", str(hvif_path), "-o", str(png_path)],
+                env=env, capture_output=True, text=True, timeout=HVIF2PNG_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            # A crafted hvif must not hang the worker; cap the render and fall
+            # back to the placeholder icon upstream.
+            raise IconError(f"hvif2png timed out after {HVIF2PNG_TIMEOUT}s")
         if proc.returncode != 0 or not png_path.is_file():
             raise IconError(f"hvif2png failed: {proc.stderr or proc.stdout}")
         return png_path.read_bytes()

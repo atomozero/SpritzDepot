@@ -100,12 +100,16 @@ class HTTPSRedirectAndHSTS(BaseHTTPMiddleware):
 
 
 app.add_middleware(HTTPSRedirectAndHSTS)
+# Auth is a bearer token in the Authorization header, never a cookie, so the API
+# needs no credentialed CORS: allow_credentials=False (a credentialed + loosely
+# configured origin is a footgun we don't need), and only the headers a JSON API
+# client actually sends. Origins stay locked to CORS_ORIGINS (never '*' in prod).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 # Applies the limiter's default_limits to every route (not just the ones with an
 # explicit @limiter.limit), so no public read endpoint is unbounded.

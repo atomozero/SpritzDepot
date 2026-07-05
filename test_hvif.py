@@ -48,6 +48,27 @@ try:
 except hvif.IconError:
     print("bad hpkg rejected  -> ok")
 
+# A hanging hvif2png must not hang the worker: subprocess.run gets a timeout,
+# and a TimeoutExpired becomes an IconError (caller falls back to placeholder).
+import subprocess as _sp
+from app import config as _cfg
+_saved_bin, _saved_run = _cfg.HVIF2PNG_BIN, hvif.subprocess.run
+_cfg.HVIF2PNG_BIN = "/bin/true"  # exists, so the tool-configured guard passes
+_seen = {}
+def _hang(cmd, **k):
+    _seen.update(k)
+    raise _sp.TimeoutExpired(cmd, k.get("timeout"))
+hvif.subprocess.run = _hang
+try:
+    hvif._render_png(hvif_blob, 64)
+    raise SystemExit("FAIL: timeout not turned into IconError")
+except hvif.IconError as e:
+    assert "timed out" in str(e), e
+    assert _seen.get("timeout") == hvif.HVIF2PNG_TIMEOUT, _seen
+    print("render timeout     -> ok (subprocess timeout -> IconError)")
+finally:
+    _cfg.HVIF2PNG_BIN, hvif.subprocess.run = _saved_bin, _saved_run
+
 # Rendering: only if the tool is configured.
 if hvif.tool_available():
     png = hvif._render_png(hvif_blob, 64)
