@@ -32,13 +32,27 @@
       try {
         var buf = new Uint8Array(xhr.response);
         var data = globalThis.Haikon.parse(buf);
-        // Match the <img>'s pixel box so layout does not shift.
-        var size = parseInt(img.getAttribute("width"), 10) || 64;
-        var svg = globalThis.HaikonSvg.renderIcon(data, size);
-        // Carry over the class so existing CSS (.app-icon, .app-icon-sm) applies.
+        var wrapper = globalThis.HaikonSvg.renderIcon(data, 64);
+        // renderIcon returns a <span> wrapping the <svg>; we want the <svg>
+        // itself so it inherits the icon's CSS box (.featured-icon, .app-icon-sm,
+        // ...) instead of the wrapper collapsing.
+        var svg = wrapper && wrapper.tagName && wrapper.tagName.toLowerCase() === "svg"
+          ? wrapper
+          : (wrapper.querySelector ? wrapper.querySelector("svg") : null);
+        if (!svg) return;  // unexpected shape: keep the <img> fallback
+        // The renderer hard-codes style="width:2em;height:2em", which makes the
+        // icon tiny. Drop it and size the svg to the exact box the <img> occupied
+        // so nothing shifts, whether the size comes from CSS (.featured-icon,
+        // .app-icon-sm) or from the <img>'s width attribute (the app page).
+        svg.removeAttribute("style");
         if (img.className) svg.setAttribute("class", img.className);
-        svg.setAttribute("width", size);
-        svg.setAttribute("height", size);
+        var box = img.getBoundingClientRect();
+        var w = Math.round(box.width) ||
+                parseInt(img.getAttribute("width"), 10) || 64;
+        var h = Math.round(box.height) ||
+                parseInt(img.getAttribute("height"), 10) || w;
+        svg.setAttribute("width", w);
+        svg.setAttribute("height", h);
         if (img.parentNode) img.parentNode.replaceChild(svg, img);
       } catch (e) {
         /* leave the original <img> (PNG or placeholder) in place */
