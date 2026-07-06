@@ -104,10 +104,14 @@ BROWSE_HIDDEN_BACARI = [
     .split(",") if b.strip()
 ]
 
-# The cichéto id highlighted in the home hero ("featured app"). Any id in the
-# catalog; if it is absent the hero shelf is simply omitted. Default: Genio.
-FEATURED_CICHETO = os.environ.get("SPRITZ_FEATURED_CICHETO",
-                                  "repo.haikuports.genio").strip() or None
+# The cichéto id(s) highlighted in the home hero ("featured apps"). A CSV list:
+# each id that exists in the catalog becomes a card in the featured carousel, in
+# the given order; absent ids are skipped. A single id still works (one card).
+# Default: Genio. FEATURED_CICHETO keeps the first id for any old single-value
+# call site; FEATURED_CICHETI is the parsed list.
+FEATURED_CICHETI = [s.strip() for s in os.environ.get(
+    "SPRITZ_FEATURED_CICHETO", "repo.haikuports.genio").split(",") if s.strip()]
+FEATURED_CICHETO = FEATURED_CICHETI[0] if FEATURED_CICHETI else None
 
 # Sub-package name suffixes that are build artifacts, not apps: -devel headers,
 # -debuginfo symbols, -source trees, -doc/-docs, and -source_debuginfo. The

@@ -202,6 +202,9 @@ STRINGS: dict[str, dict[str, str]] = {
     # UI profile toggle (lite for WebPositive/Haiku, modern for other browsers)
     'ui.switch_modern': {"it": 'Versione moderna', "es": 'Versión moderna', "de": 'Moderne Ansicht', "zh": '现代版', "nl": 'Moderne versie', "fr": 'Version moderne', "ja": 'モダン表示', "vec": 'Version moderna'},
     'ui.switch_lite': {"it": 'Versione classica', "es": 'Versión clásica', "de": 'Klassische Ansicht', "zh": '经典版', "nl": 'Klassieke versie', "fr": 'Version classique', "ja": 'クラシック表示', "vec": 'Version clasica'},
+    # featured carousel arrows (aria-label)
+    'featured.prev': {"it": 'App precedenti', "es": 'Apps anteriores', "de": 'Vorherige Apps', "zh": '上一组应用', "nl": 'Vorige apps', "fr": 'Apps précédentes', "ja": '前のアプリ', "vec": 'App prima'},
+    'featured.next': {"it": 'App successive', "es": 'Apps siguientes', "de": 'Nächste Apps', "zh": '下一组应用', "nl": 'Volgende apps', "fr": 'Apps suivantes', "ja": '次のアプリ', "vec": 'App dopo'},
 }
 
 

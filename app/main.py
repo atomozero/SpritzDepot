@@ -767,14 +767,16 @@ def _random_third_party(session: Session, limit: int = 8,
     return [_row_dict(r) for r in session.exec(stmt).all()]
 
 
-def _featured(session: Session) -> Optional[dict]:
-    """The single highlighted app for the hero shelf. Configurable via
-    SPRITZ_FEATURED_CICHETO; falls back to none if that id is absent."""
-    fid = config.FEATURED_CICHETO
-    if not fid:
-        return None
-    row = session.get(CichetoRow, fid)
-    return _row_dict(row) if row else None
+def _featured_list(session: Session) -> list:
+    """The highlighted apps for the hero carousel, in configured order. Each id in
+    SPRITZ_FEATURED_CICHETO (CSV) that exists becomes a card; absent ids are
+    skipped. Empty list if none resolve, so the shelf is omitted."""
+    out = []
+    for fid in config.FEATURED_CICHETI:
+        row = session.get(CichetoRow, fid)
+        if row:
+            out.append(_row_dict(row))
+    return out
 
 
 @app.get("/search")
@@ -1454,9 +1456,9 @@ def home(request: Request, q: str = Query(""), category: str = Query(""),
     # while paging deeper. Featured/random are excluded from the plain grid below
     # so nothing shows twice.
     if is_browse and page == 1:
-        featured = _featured(session)
+        featured = _featured_list(session)
         top = _top_downloads(session, since_days=30, limit=8)
-        shown = {featured["id"]} if featured else set()
+        shown = {f["id"] for f in featured}
         shown.update(r["id"] for r in top)
         random_apps = _dedup_groups(_random_third_party(session, limit=24,
                                                         exclude=shown))[:8]

@@ -209,6 +209,27 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .featured-meta .badge { margin-top: 2px; }
 .featured-cta { margin-left: 22px; flex-shrink: 0; }
 
+/* --- featured carousel (lite-safe baseline) --- */
+.featured-carousel { display: flex; align-items: center; margin-top: 14px; }
+.featured-track {
+  /* A horizontal row of cards. Lite (WebPositive) shows two at a time via JS
+     display toggling; the row itself does not need to scroll there. */
+  display: flex; flex: 1 1 auto; overflow: hidden;
+}
+.featured-carousel .featured-card {
+  /* Two cards side by side: each ~half the track minus the gap. margin-top is
+     reset because the carousel container already spaces the section. */
+  flex: 0 0 auto; width: 49%; margin-top: 0; margin-right: 2%; box-sizing: border-box;
+}
+.featured-carousel .featured-card:last-child { margin-right: 0; }
+.featured-nav {
+  flex: 0 0 auto; width: 34px; height: 34px; margin: 0 6px;
+  border: 1px solid #cdd7e5; background: #ffffff; color: #334155;
+  border-radius: 50%; font-size: 20px; line-height: 1; cursor: pointer;
+}
+.featured-nav:hover { background: #f1f5f9; border-color: #94a3b8; }
+.featured-nav[disabled] { opacity: 0.4; cursor: default; }
+
 /* ---------- Pager ---------- */
 /* flex `gap` only shipped in WebKit 14.1, newer than WebPositive's fork, so it
    collapses to zero spacing there. Use per-child margins instead (the rest of
@@ -415,4 +436,26 @@ body.ui-modern .badge { border-radius: 999px; }
   body.ui-modern .badge { transition: none; }
   body.ui-modern .app-card:hover,
   body.ui-modern .btn:hover { transform: none; }
+}
+
+/* Featured carousel, modern profile: the track scrolls fluidly with snap instead
+   of JS pagination. Guarded by @supports so lite/older engines keep the baseline
+   (JS-paged) behaviour. */
+@supports (scroll-snap-type: x mandatory) {
+  body.ui-modern .featured-track {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    gap: 18px;
+    scrollbar-width: thin;
+  }
+  body.ui-modern .featured-carousel .featured-card {
+    /* Show two per view but let them scroll; snap each card to the start. */
+    width: 49%; margin-right: 0; scroll-snap-align: start;
+  }
+  /* Hide the horizontal scrollbar chrome on webkit while keeping it scrollable. */
+  body.ui-modern .featured-track::-webkit-scrollbar { height: 8px; }
+  body.ui-modern .featured-track::-webkit-scrollbar-thumb {
+    background: #cbd5e1; border-radius: 4px;
+  }
 }

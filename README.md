@@ -99,7 +99,7 @@ to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
 | `SPRITZ_HVIF2PNG_BIN` | non impostata | Path al tool `hvif2png` di Haiku per estrarre le icone dagli hpkg (vedi `docs/SETUP-WSL.md`). Senza, `/icon` risponde 404 e il frontend usa il placeholder. |
 | `SPRITZ_MAX_HPKG_ICON_BYTES` | `104857600` (100MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
 | `SPRITZ_HDS_URL` | `https://depot.haiku-os.org` | Base URL di HaikuDepotServer, da cui spritz importa (proxy + cache) gli screenshot per le app che non ne hanno di propri nel cichéto. Puntalo a un mirror se serve. |
-| `SPRITZ_FEATURED_CICHETO` | `repo.haikuports.genio` | Id del cichéto messo in evidenza nella home. Se assente dal catalogo, la sezione viene omessa. |
+| `SPRITZ_FEATURED_CICHETO` | `repo.haikuports.genio` | Id (o lista di id separati da virgola) dei cichéti in evidenza nella home. Con più id la sezione diventa un carosello (scorrevole sui browser moderni, a coppie con le frecce su WebPositive). Gli id assenti dal catalogo vengono saltati; se non ne resta nessuno la sezione è omessa. |
 | `SPRITZ_BROWSE_HIDDEN_BACARI` | `haikuports` | Bàcari nascosti dalla vetrina/home (CSV). Restano cercabili e raggiungibili per link; la ricerca e i filtri espliciti li mostrano. Serve a non far dominare il mirror HaikuPorts la vetrina. |
 | `SPRITZ_BROWSE_HIDDEN_SUFFIXES` | `_devel,_debuginfo,_debug,_source,_sources,_doc,_docs,_dev` | Suffissi di sotto-pacchetto (build artifact) nascosti dalla vetrina (CSV, match su id e nome). Restano cercabili. |
 

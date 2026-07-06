@@ -62,19 +62,31 @@
 {% if featured %}
 <section class="featured">
   <h2 class="shelf-title">{{ t('home.featured') }}</h2>
-  <a class="featured-card" href="/app/{{ featured.id }}">
-    {{ app_icon(featured, 'featured-icon') }}
-    <span class="featured-body">
-      <span class="featured-name">{{ featured.name }}</span>
-      <span class="featured-summary">{{ featured.summary }}</span>
-      <span class="featured-meta">
-        <span class="badge badge-bacaro">bacaro: {{ featured.bacaro }}</span>
-        {% for ch in featured.channels %}<span class="badge badge-channel">{{ ch }}</span>{% endfor %}
-      </span>
-    </span>
-    <span class="btn featured-cta">{{ t('home.featured_cta') }}</span>
-  </a>
+  {# Carousel: modern browsers scroll the track fluidly (scroll-snap); on
+     WebPositive/lite, featured.js paginates the cards two at a time with the
+     arrows. With a single card the arrows hide themselves. #}
+  <div class="featured-carousel" data-featured-carousel>
+    <button type="button" class="featured-nav featured-prev" aria-label="{{ t('featured.prev') }}">&lsaquo;</button>
+    <div class="featured-track">
+      {% for f in featured %}
+      <a class="featured-card" href="/app/{{ f.id }}">
+        {{ app_icon(f, 'featured-icon') }}
+        <span class="featured-body">
+          <span class="featured-name">{{ f.name }}</span>
+          <span class="featured-summary">{{ f.summary }}</span>
+          <span class="featured-meta">
+            <span class="badge badge-bacaro">bacaro: {{ f.bacaro }}</span>
+            {% for ch in f.channels %}<span class="badge badge-channel">{{ ch }}</span>{% endfor %}
+          </span>
+        </span>
+        <span class="btn featured-cta">{{ t('home.featured_cta') }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <button type="button" class="featured-nav featured-next" aria-label="{{ t('featured.next') }}">&rsaquo;</button>
+  </div>
 </section>
+<script src="/static/featured.js" defer></script>
 {% endif %}
 
 {% if top_downloads %}
