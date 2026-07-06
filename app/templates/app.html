@@ -11,6 +11,7 @@
     <img class="app-icon" src="{{ app.icon }}" alt="" width="64" height="64">
     {% else %}
     <img class="app-icon" width="64" height="64" alt="" src="/icon/{{ app.id }}"
+         data-hvif="{{ app.id }}"
          onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
     {% endif %}
     <div class="app-detail-titles">

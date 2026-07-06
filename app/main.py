@@ -1540,6 +1540,15 @@ def library_page(request: Request):
     return render(request, "library.html", {})
 
 
+@app.get("/hvif-test", response_class=HTMLResponse)
+def hvif_test_page(request: Request):
+    """Throwaway diagnostic: does the client-side HVIF parser/renderer
+    (haikon_full.js) run in the visitor's browser? Renders a real HVIF to SVG and
+    logs each step on the page, so WebPositive compatibility can be checked
+    without a devtools console. Standalone template (does not extend base)."""
+    return templates.TemplateResponse(request, "hvif_test.html", {})
+
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     """Privacy notice (GDPR arts. 13-14): what data spritz stores, the legal
@@ -1684,6 +1693,72 @@ def _hpkg_url_for_icon(row: CichetoRow) -> Optional[str]:
                 return art["url"]
         except hpkr.HpkrError:
             return None
+    return None
+
+
+@app.get("/hvif/{cicheto_id}")
+@limiter.limit("60/minute")
+def app_hvif(request: Request, cicheto_id: str,
+             session: Session = Depends(get_session)):
+    """Serve an app's RAW HVIF icon blob (the 'ncif' vector data) from its hpkg,
+    cached. The frontend renders it to SVG client-side (haikon_full.js), so this
+    needs no hvif2png tool. 404 (with a negative cache) when the app ships no
+    HVIF; the frontend then falls back to the generated placeholder."""
+    if "/" in cicheto_id or "\\" in cicheto_id:
+        raise HTTPException(400, "bad id")
+    icons_dir = Path(config.UPLOAD_DIR) / "hvif"
+    cache_path = icons_dir / f"{cicheto_id}.hvif"
+    if cache_path.is_file():
+        return FileResponse(cache_path, media_type="application/x-vnd.haiku-icon")
+    miss = icons_dir / f"{cicheto_id}.none"
+    if miss.is_file():
+        raise HTTPException(404, "no icon (cached miss)")
+
+    row = session.get(CichetoRow, cicheto_id)
+    if not row:
+        raise HTTPException(404, "Cichéto not found")
+
+    blob = _extract_hvif_blob(row)
+    if blob is None:
+        blob = _borrow_twin_hvif(session, row)
+    if blob is None:
+        icons_dir.mkdir(parents=True, exist_ok=True)
+        miss.write_bytes(b"")      # remember the miss; don't re-download next time
+        raise HTTPException(404, "no icon available")
+    cache.write_capped(cache_path, blob)   # size-bounded LRU cache
+    return FileResponse(cache_path, media_type="application/x-vnd.haiku-icon")
+
+
+def _extract_hvif_blob(row: CichetoRow) -> Optional[bytes]:
+    """This cichéto's own raw HVIF blob from its hpkg, or None if there is no
+    hpkg to pull from or the extraction fails. No hvif2png needed."""
+    url = _hpkg_url_for_icon(row)
+    if not url:
+        return None
+    try:
+        return hvif.hvif_blob_from_hpkg_url(url)
+    except hvif.IconError:
+        return None
+
+
+def _borrow_twin_hvif(session: Session, row: CichetoRow) -> Optional[bytes]:
+    """Raw HVIF of a twin copy (same dedup key, different id) that has one.
+    Prefers a cached blob; else extracts, best-ranked source first."""
+    key = dedup_key_for_name(row.name)
+    if not key:
+        return None
+    twins = list(session.exec(
+        select(CichetoRow).where(CichetoRow.dedup_key == key,
+                                 CichetoRow.id != row.id)).all())
+    twins.sort(key=lambda o: _bacaro_rank(o.bacaro))
+    for twin in twins:
+        cached = Path(config.UPLOAD_DIR) / "hvif" / f"{twin.id}.hvif"
+        if cached.is_file():
+            return cached.read_bytes()
+        blob = _extract_hvif_blob(twin)
+        if blob is not None:
+            cache.write_capped(cached, blob)
+            return blob
     return None
 
 

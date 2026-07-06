@@ -9,7 +9,7 @@
     {% else %}
     {# Try the extracted hpkg icon; on 404 fall back to the Haiku SVG placeholder
        (onerror cleared so it can't loop). #}
-    <img class="app-icon-sm" src="/icon/{{ app.id }}" alt=""
+    <img class="app-icon-sm" src="/icon/{{ app.id }}" alt="" data-hvif="{{ app.id }}"
          onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
     {% endif %}
     <span class="app-link-text">
@@ -43,7 +43,7 @@
   {% if app.icon %}
   <img class="{{ cls }}" src="{{ app.icon }}" alt="">
   {% else %}
-  <img class="{{ cls }}" src="/icon/{{ app.id }}" alt=""
+  <img class="{{ cls }}" src="/icon/{{ app.id }}" alt="" data-hvif="{{ app.id }}"
        onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
   {% endif %}
 {% endmacro %}

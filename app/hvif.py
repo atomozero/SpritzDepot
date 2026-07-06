@@ -104,16 +104,12 @@ def _render_png(hvif: bytes, size: int = 64) -> bytes:
         return png_path.read_bytes()
 
 
-def icon_png_from_hpkg_url(url: str, size: int = 64,
-                           client: Optional[httpx.Client] = None) -> bytes:
-    """Download an hpkg (size-capped) and return its icon as PNG bytes.
-
-    Raises IconError on any problem (too big, no icon, tool missing) so the
-    caller can fall back to the placeholder.
+def hvif_blob_from_hpkg_url(url: str,
+                            client: Optional[httpx.Client] = None) -> bytes:
+    """Download an hpkg (size-capped) and return its raw HVIF icon blob (the
+    'ncif' vector data), WITHOUT rendering. This needs no hvif2png tool: the blob
+    can be rendered to SVG client-side. Raises IconError on any problem.
     """
-    if not tool_available():
-        raise IconError("hvif2png not configured")
-
     def _read_capped(r) -> bytearray:
         r.raise_for_status()
         data = bytearray()
@@ -142,5 +138,17 @@ def icon_png_from_hpkg_url(url: str, size: int = 64,
     except httpx.HTTPError as e:
         raise IconError(f"fetch failed: {e}") from e
 
-    hvif = _extract_hvif(bytes(data))
+    return _extract_hvif(bytes(data))
+
+
+def icon_png_from_hpkg_url(url: str, size: int = 64,
+                           client: Optional[httpx.Client] = None) -> bytes:
+    """Download an hpkg (size-capped) and return its icon as PNG bytes.
+
+    Raises IconError on any problem (too big, no icon, tool missing) so the
+    caller can fall back to the placeholder.
+    """
+    if not tool_available():
+        raise IconError("hvif2png not configured")
+    hvif = hvif_blob_from_hpkg_url(url, client=client)
     return _render_png(hvif, size)

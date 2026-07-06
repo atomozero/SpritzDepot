@@ -215,3 +215,12 @@ L'utente può esercitare i propri diritti dall'interfaccia:
   portabilità, artt. 15 e 20) via `GET /auth/me`, o elimina definitivamente
   account e libreria (diritto all'oblio, art. 17) via `POST /auth/delete-account`
   (richiede la password).
+
+## Componenti di terze parti
+
+- **haikon_full.js** (`app/static/`): parser e renderer HVIF -> SVG lato client, di
+  3dEyes** (Gerasim Troeglazov), da https://hvif-store.art (vedi anche
+  https://github.com/threedeyes/hvif-tools). Licenza MIT. spritz lo usa per
+  disegnare le icone delle app come SVG nel browser (endpoint `/hvif/{id}` che
+  serve il blob HVIF grezzo), senza dipendere dal tool nativo `hvif2png`. Il
+  rendering PNG lato server (`hvif2png` + `/icon/{id}`) resta come alternativa.

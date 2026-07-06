@@ -7,6 +7,10 @@
   <meta name="description" content="{% block description %}{{ t('home.hero_lead') }}{% endblock %}">
   <link rel="stylesheet" href="/static/spritz.css?v={{ asset_version }}">
   <script src="/static/auth.js"></script>
+  <!-- Client-side HVIF -> SVG icons (progressive enhancement; falls back to the
+       /icon PNG or the placeholder if these do not load or run). -->
+  <script src="/static/haikon_full.js"></script>
+  <script src="/static/icon.js" defer></script>
 </head>
 <body class="ui-{{ ui|default('modern') }}">
   <header class="site-header">
