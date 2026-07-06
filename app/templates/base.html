@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/spritz.css?v={{ asset_version }}">
   <script src="/static/auth.js"></script>
 </head>
-<body>
+<body class="ui-{{ ui|default('modern') }}">
   <header class="site-header">
     <a class="brand" href="/">spritz</a>
     <form class="search-inline" action="/" method="get">
@@ -38,7 +38,15 @@
 
   <footer class="site-footer">
     <p>{{ t('footer.text') }}</p>
-    <p><a href="/privacy">{{ t('privacy.link') }}</a></p>
+    <p>
+      <a href="/privacy">{{ t('privacy.link') }}</a>
+      &middot;
+      {% if ui == 'lite' %}
+      <a href="/set-ui/modern">{{ t('ui.switch_modern') }}</a>
+      {% else %}
+      <a href="/set-ui/lite">{{ t('ui.switch_lite') }}</a>
+      {% endif %}
+    </p>
   </footer>
 </body>
 </html>

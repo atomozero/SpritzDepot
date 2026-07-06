@@ -43,7 +43,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
 from . import (cache, config, hds, hpkr, hvif, i18n, netguard, ombra,
-               ombra_crawler, repo_proxy, uploads, version)
+               ombra_crawler, repo_proxy, uiprofile, uploads, version)
 from . import auth as auth_config
 from .auth import (MIN_PASSWORD_LENGTH, current_user, hash_password, make_token,
                    verify_password)
@@ -153,6 +153,9 @@ def render(request: Request, template: str, ctx: Optional[dict] = None):
         "langs": i18n.LANGS,
         "flags": i18n.FLAGS,
         "t": lambda key, **f: i18n.t(key, lang, **f),
+        # 'lite' (WebPositive/Haiku) or 'modern'; the base template turns this
+        # into a body class so the CSS can layer modern styling as enhancement.
+        "ui": uiprofile.ui_profile(request),
     }
     base.update(ctx or {})
     return templates.TemplateResponse(request, template, base)
@@ -181,6 +184,21 @@ def set_lang(lang: str, request: Request):
     back = request.headers.get("referer") or "/"
     resp = RedirectResponse(back, status_code=303)
     resp.set_cookie("lang", code, max_age=60 * 60 * 24 * 365, samesite="lax")
+    return resp
+
+
+@app.get("/set-ui/{profile}")
+def set_ui(profile: str, request: Request):
+    """Force the UI profile (lite/modern) via a cookie and return to where the
+    user came from. Overrides the User-Agent sniff; an invalid value clears the
+    override so detection resumes."""
+    code = uiprofile.normalize_profile(profile)
+    back = request.headers.get("referer") or "/"
+    resp = RedirectResponse(back, status_code=303)
+    if code:
+        resp.set_cookie("ui", code, max_age=60 * 60 * 24 * 365, samesite="lax")
+    else:
+        resp.delete_cookie("ui")
     return resp
 
 

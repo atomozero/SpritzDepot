@@ -199,6 +199,9 @@ STRINGS: dict[str, dict[str, str]] = {
     'account.need_login': {"it": 'Accedi per vedere i tuoi dati.', "es": 'Accede para ver tus datos.', "de": 'Melde dich an, um deine Daten zu sehen.', "zh": '请登录以查看你的数据。', "nl": 'Log in om je gegevens te zien.', "fr": 'Connectez-vous pour voir vos données.', "ja": 'データを表示するにはログインしてください。', "vec": 'Entra par védar i to dati.'},
     'account.wrong_pw': {"it": 'Password errata.', "es": 'Contraseña incorrecta.', "de": 'Falsches Passwort.', "zh": '密码错误。', "nl": 'Onjuist wachtwoord.', "fr": 'Mot de passe incorrect.', "ja": 'パスワードが違います。', "vec": 'Password sbaglià.'},
     'nav.account': {"it": 'I miei dati', "es": 'Mis datos', "de": 'Meine Daten', "zh": '我的数据', "nl": 'Mijn gegevens', "fr": 'Mes données', "ja": 'マイデータ', "vec": 'I me dati'},
+    # UI profile toggle (lite for WebPositive/Haiku, modern for other browsers)
+    'ui.switch_modern': {"it": 'Versione moderna', "es": 'Versión moderna', "de": 'Moderne Ansicht', "zh": '现代版', "nl": 'Moderne versie', "fr": 'Version moderne', "ja": 'モダン表示', "vec": 'Version moderna'},
+    'ui.switch_lite': {"it": 'Versione classica', "es": 'Versión clásica', "de": 'Klassische Ansicht', "zh": '经典版', "nl": 'Klassieke versie', "fr": 'Version classique', "ja": 'クラシック表示', "vec": 'Version clasica'},
 }
 
 

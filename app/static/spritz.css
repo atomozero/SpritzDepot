@@ -322,3 +322,97 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
   .search-inline { margin: 8px 0; width: 100%; }
   .search-inline input { width: 100%; min-width: 0; }
 }
+
+/* ============================================================================
+   MODERN PROFILE (browsers other than WebPositive/Haiku).
+   Everything above is the lite-safe baseline that WebPositive renders fine.
+   The rules below are layered ENHANCEMENT under body.ui-modern: newer browsers
+   get grid, smooth transitions, richer depth and type. Guarded by @supports so
+   a browser missing a feature simply keeps the baseline instead of breaking.
+   The whole block is scoped to .ui-modern, so the lite profile never sees it.
+   ============================================================================ */
+
+/* Design tokens, only for the modern profile. */
+.ui-modern {
+  --accent: #2563eb;
+  --accent-2: #22d3ee;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --card-bg: #ffffff;
+  --card-border: #e6ebf3;
+  --page-bg: #f6f8fc;
+  --radius: 14px;
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.ui-modern body,
+body.ui-modern {
+  background: var(--page-bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Header: a touch more polish and a subtle sticky elevation. */
+body.ui-modern .site-header {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(11, 18, 32, 0.28);
+}
+body.ui-modern .brand,
+body.ui-modern .header-link,
+body.ui-modern .btn,
+body.ui-modern .app-card,
+body.ui-modern .badge {
+  transition: color .15s ease, background-color .15s ease,
+              border-color .15s ease, box-shadow .2s ease, transform .15s ease;
+}
+
+/* Card catalog: real responsive grid instead of flex-wrap widths. */
+@supports (display: grid) {
+  body.ui-modern .app-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 18px;
+    margin: 20px 0;
+  }
+  body.ui-modern .app-card {
+    width: auto;
+    min-width: 0;
+    margin: 0;              /* the grid gap handles spacing now */
+  }
+}
+
+body.ui-modern .app-card {
+  border-radius: var(--radius);
+  border-color: var(--card-border);
+  box-shadow: var(--shadow-sm);
+}
+body.ui-modern .app-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: #cfd9ea;
+}
+
+/* Buttons: gradient accent + lift on hover. */
+body.ui-modern .btn {
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+}
+body.ui-modern .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+
+/* Badges: softer, pill-shaped. */
+body.ui-modern .badge { border-radius: 999px; }
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  body.ui-modern .brand,
+  body.ui-modern .header-link,
+  body.ui-modern .btn,
+  body.ui-modern .app-card,
+  body.ui-modern .badge { transition: none; }
+  body.ui-modern .app-card:hover,
+  body.ui-modern .btn:hover { transform: none; }
+}
