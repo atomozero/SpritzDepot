@@ -18,6 +18,7 @@ cd "$(dirname "$0")"
 
 # --- defaults ---
 HOST="127.0.0.1"
+HOST_SET=0        # did the user pass --host explicitly?
 PORT="8000"
 PROD=0
 CRAWL=0
@@ -28,7 +29,7 @@ while [ $# -gt 0 ]; do
     --prod)     PROD=1 ;;
     --crawl)    CRAWL=1 ;;
     --no-seed)  SEED=0 ;;
-    --host)     HOST="${2:?--host needs a value}"; shift ;;
+    --host)     HOST="${2:?--host needs a value}"; HOST_SET=1; shift ;;
     --port)     PORT="${2:?--port needs a value}"; shift ;;
     -h|--help)
       sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//;s/^#$//'
@@ -71,6 +72,20 @@ if [ "$PROD" -eq 1 ]; then
     echo "note: SPRITZ_GITHUB_TOKEN not set; ombra resolves are rate-limited to 60/h" >&2
 else
   export SPRITZ_ENV="${SPRITZ_ENV:-dev}"
+fi
+
+# --- WSL convenience: in dev on WSL, 127.0.0.1 inside the WSL VM is NOT the same
+#     127.0.0.1 the Windows browser sees, so a default bind is unreachable from
+#     Windows (connection reset/refused). If the user did not pin --host, bind all
+#     interfaces so Windows can reach it, and print the WSL IP to open. Prod and an
+#     explicit --host are left untouched. ---
+IS_WSL=0
+if grep -qiE "microsoft|wsl" /proc/version 2>/dev/null; then IS_WSL=1; fi
+if [ "$PROD" -eq 0 ] && [ "$HOST_SET" -eq 0 ] && [ "$IS_WSL" -eq 1 ]; then
+  HOST="0.0.0.0"
+  WSL_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  echo "WSL detected -> binding 0.0.0.0 so Windows can reach it."
+  echo "  open from Windows:  http://localhost:$PORT/   (or http://${WSL_IP:-<wsl-ip>}:$PORT/)"
 fi
 
 # --- seed the catalog only when it is empty, so we never clobber a real one.
