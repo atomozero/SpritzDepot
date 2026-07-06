@@ -107,10 +107,12 @@ BROWSE_HIDDEN_BACARI = [
 # The cichéto id(s) highlighted in the home hero ("featured apps"). A CSV list:
 # each id that exists in the catalog becomes a card in the featured carousel, in
 # the given order; absent ids are skipped. A single id still works (one card).
-# Default: Genio. FEATURED_CICHETO keeps the first id for any old single-value
-# call site; FEATURED_CICHETI is the parsed list.
+# FEATURED_CICHETO keeps the first id for any old single-value call site;
+# FEATURED_CICHETI is the parsed list. Override with SPRITZ_FEATURED_CICHETO.
+_DEFAULT_FEATURED = ("org.haiku.genio,com.atomozero.localsend,"
+                     "com.atomozero.sestriere,com.atomozero.teslaviewer")
 FEATURED_CICHETI = [s.strip() for s in os.environ.get(
-    "SPRITZ_FEATURED_CICHETO", "repo.haikuports.genio").split(",") if s.strip()]
+    "SPRITZ_FEATURED_CICHETO", _DEFAULT_FEATURED).split(",") if s.strip()]
 FEATURED_CICHETO = FEATURED_CICHETI[0] if FEATURED_CICHETI else None
 
 # Sub-package name suffixes that are build artifacts, not apps: -devel headers,
