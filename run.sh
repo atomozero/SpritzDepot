@@ -8,6 +8,7 @@
 #   ./run.sh --host 0.0.0.0  # bind address (default 127.0.0.1)
 #   ./run.sh --crawl         # prefetch ombra snapshots before serving
 #   ./run.sh --no-seed       # never seed, even on an empty catalog
+#   ./run.sh --no-reload     # steady server (no restart on file edits)
 #
 # Environment (see README "Variabili d'ambiente"): SPRITZ_ENV, SPRITZ_SECRET,
 # SPRITZ_ADMIN_TOKEN, SPRITZ_GITHUB_TOKEN, SPRITZ_DB_URL, ... are read as-is;
@@ -23,14 +24,16 @@ PORT="8000"
 PROD=0
 CRAWL=0
 SEED=1
+RELOAD=1          # dev auto-reload on file changes; --no-reload turns it off
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --prod)     PROD=1 ;;
-    --crawl)    CRAWL=1 ;;
-    --no-seed)  SEED=0 ;;
-    --host)     HOST="${2:?--host needs a value}"; HOST_SET=1; shift ;;
-    --port)     PORT="${2:?--port needs a value}"; shift ;;
+    --prod)       PROD=1 ;;
+    --crawl)      CRAWL=1 ;;
+    --no-seed)    SEED=0 ;;
+    --no-reload)  RELOAD=0 ;;
+    --host)       HOST="${2:?--host needs a value}"; HOST_SET=1; shift ;;
+    --port)       PORT="${2:?--port needs a value}"; shift ;;
     -h|--help)
       sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//;s/^#$//'
       exit 0 ;;
@@ -114,10 +117,12 @@ if [ "$CRAWL" -eq 1 ]; then
   "$PY" crawl_ombra.py || echo "warning: ombra crawl failed (server starts anyway)" >&2
 fi
 
-# --- serve. Reload in dev (watches the source); off in prod. ---
+# --- serve. Auto-reload in dev (watches the source) unless --no-reload; never in
+#     prod. Note: with --reload, editing any file restarts the server and resets
+#     open connections for a moment, so use --no-reload for a steady session. ---
 echo "starting spritz on http://$HOST:$PORT  (env=$SPRITZ_ENV)  docs: /docs"
-if [ "$PROD" -eq 1 ]; then
-  exec "$PY" -m uvicorn app.main:app --host "$HOST" --port "$PORT"
-else
+if [ "$PROD" -eq 0 ] && [ "$RELOAD" -eq 1 ]; then
   exec "$PY" -m uvicorn app.main:app --host "$HOST" --port "$PORT" --reload
+else
+  exec "$PY" -m uvicorn app.main:app --host "$HOST" --port "$PORT"
 fi
