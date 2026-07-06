@@ -58,6 +58,13 @@ open $BASE_URL
 - [ ] `/publish` and `/library-page` render and their forms work (paste token,
       submit). Note any JS that WebPositive cannot run.
 - [ ] No mixed-content surprises if the server is https.
+- [ ] UI profile: WebPositive is auto-detected and served the LITE profile
+      (`<body class="ui-lite">`). Capture WebPositive's exact User-Agent string
+      and confirm `app/uiprofile._LITE_UA_MARKERS` matches it; today we rely on
+      the "WebPositive"/"Haiku" tokens without having seen the real UA. The
+      footer toggle (`/set-ui/modern` <-> `/set-ui/lite`) switches profiles, and
+      forcing modern on WebPositive must still be usable (it is enhancement, not
+      a different page).
 
 ## 3. The degrading button + spritz:// scheme
 
