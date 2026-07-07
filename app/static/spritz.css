@@ -4,6 +4,14 @@
 
 * { box-sizing: border-box; }
 
+html, body {
+  /* Clip horizontal overflow at the page edge. The .hero band is full-bleed via
+     a margin/padding of 9999px, which only stays contained if something hides the
+     x-overflow; without this the page scrolls sideways to infinity. Also a safety
+     net for any wide child (e.g. the featured carousel). */
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: "DejaVu Sans", Verdana, Arial, sans-serif;
@@ -213,13 +221,17 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .featured-carousel { display: flex; align-items: center; margin-top: 14px; }
 .featured-track {
   /* A horizontal row of cards. Lite (WebPositive) shows two at a time via JS
-     display toggling; the row itself does not need to scroll there. */
-  display: flex; flex: 1 1 auto; overflow: hidden;
+     display toggling; the row itself does not need to scroll there.
+     min-width:0 is essential: without it this flex child grows to fit ALL its
+     cards side by side (4 x 49% ~= 2x the page) and pushes the whole page wider,
+     giving an endless horizontal scroll. min-width:0 lets it shrink to the
+     carousel and clip the overflow instead. */
+  display: flex; flex: 1 1 auto; min-width: 0; overflow: hidden;
 }
 .featured-carousel .featured-card {
   /* Two cards side by side: each ~half the track minus the gap. margin-top is
      reset because the carousel container already spaces the section. */
-  flex: 0 0 auto; width: 49%; margin-top: 0; margin-right: 2%; box-sizing: border-box;
+  flex: 0 0 48%; width: 48%; margin-top: 0; margin-right: 2%; box-sizing: border-box;
 }
 .featured-carousel .featured-card:last-child { margin-right: 0; }
 .featured-nav {
@@ -443,6 +455,8 @@ body.ui-modern .badge { border-radius: 999px; }
    (JS-paged) behaviour. */
 @supports (scroll-snap-type: x mandatory) {
   body.ui-modern .featured-track {
+    /* min-width:0 (from the baseline) keeps this from widening the page; here we
+       swap the clipped overflow for a scrollable, snapping track. */
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
@@ -450,8 +464,10 @@ body.ui-modern .badge { border-radius: 999px; }
     scrollbar-width: thin;
   }
   body.ui-modern .featured-carousel .featured-card {
-    /* Show two per view but let them scroll; snap each card to the start. */
-    width: 49%; margin-right: 0; scroll-snap-align: start;
+    /* Two per view; the gap handles spacing (drop the baseline margin) so the
+       widths sum correctly and don't overflow the page. */
+    flex: 0 0 calc(50% - 9px); width: calc(50% - 9px);
+    margin-right: 0; scroll-snap-align: start;
   }
   /* Hide the horizontal scrollbar chrome on webkit while keeping it scrollable. */
   body.ui-modern .featured-track::-webkit-scrollbar { height: 8px; }
