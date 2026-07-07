@@ -9,9 +9,15 @@
          data-m-error="{{ t('pub.error') }}"
          data-m-copy="{{ t('account.token_copy') }}"
          data-m-copied="{{ t('account.token_copied') }}"
-         data-m-tokennone="{{ t('account.token_none') }}">
+         data-m-tokennone="{{ t('account.token_none') }}"
+         data-m-emailnone="{{ t('account.email_none') }}">
   <h1>{{ t('account.title') }}</h1>
   <p class="lead">{{ t('account.lead') }}</p>
+
+  <section class="install">
+    <h2>{{ t('account.email_title') }}</h2>
+    <p><strong id="account-email"></strong></p>
+  </section>
 
   <section class="install">
     <h2>{{ t('account.token_title') }}</h2>

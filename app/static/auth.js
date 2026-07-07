@@ -42,7 +42,6 @@ window.spritzAuth = (function () {
   function refreshHeader() {
     var login = document.getElementById("nav-login");
     var logout = document.getElementById("nav-logout");
-    var who = document.getElementById("nav-who");
     var account = document.getElementById("nav-account");
     var admin = document.getElementById("nav-admin");
     if (!login || !logout) return;
@@ -51,13 +50,11 @@ window.spritzAuth = (function () {
       logout.style.display = "";
       if (account) account.style.display = "";
       if (admin) admin.style.display = isAdmin() ? "" : "none";
-      if (who) { who.style.display = ""; who.textContent = getEmail() || "loggato"; }
     } else {
       login.style.display = "";
       logout.style.display = "none";
       if (account) account.style.display = "none";
       if (admin) admin.style.display = "none";
-      if (who) who.style.display = "none";
     }
   }
 

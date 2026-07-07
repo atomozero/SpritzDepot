@@ -218,6 +218,8 @@ STRINGS: dict[str, dict[str, str]] = {
     'account.token_copy': {"it": 'Copia', "en": 'Copy', "ar": 'نسخ', "es": 'Copiar', "de": 'Kopieren', "zh": '复制', "nl": 'Kopiëren', "fr": 'Copier', "ja": 'コピー', "vec": 'Copia'},
     'account.token_copied': {"it": 'Copiato', "en": 'Copied', "ar": 'تم النسخ', "es": 'Copiado', "de": 'Kopiert', "zh": '已复制', "nl": 'Gekopieerd', "fr": 'Copié', "ja": 'コピーしました', "vec": 'Copià'},
     'account.token_none': {"it": 'Accedi per vedere il tuo token.', "en": 'Log in to see your token.', "ar": 'سجّل الدخول لرؤية رمزك.', "es": 'Accede para ver tu token.', "de": 'Melde dich an, um dein Token zu sehen.', "zh": '登录以查看你的令牌。', "nl": 'Log in om je token te zien.', "fr": 'Connectez-vous pour voir votre jeton.', "ja": 'トークンを表示するにはログインしてください。', "vec": 'Entra par védar el to token.'},
+    'account.email_title': {"it": 'Account', "en": 'Account', "ar": 'الحساب', "es": 'Cuenta', "de": 'Konto', "zh": '账户', "nl": 'Account', "fr": 'Compte', "ja": 'アカウント', "vec": 'Account'},
+    'account.email_none': {"it": 'Non hai effettuato l\'accesso su questo indirizzo.', "en": 'You are not logged in on this address.', "ar": 'لم تسجّل الدخول على هذا العنوان.', "es": 'No has iniciado sesión en esta dirección.', "de": 'Du bist auf dieser Adresse nicht angemeldet.', "zh": '你未在此地址登录。', "nl": 'Je bent niet ingelogd op dit adres.', "fr": "Vous n'êtes pas connecté sur cette adresse.", "ja": 'このアドレスではログインしていません。', "vec": 'No ti gà fato l\'acesso su sto indiriso.'},
     'featured.next': {"it": 'App successive', "en": "Next apps", "ar": "التطبيقات التالية", "es": 'Apps siguientes', "de": 'Nächste Apps', "zh": '下一组应用', "nl": 'Volgende apps', "fr": 'Apps suivantes', "ja": '次のアプリ', "vec": 'App dopo'},
 }
 

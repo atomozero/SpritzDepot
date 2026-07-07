@@ -13,6 +13,13 @@
     return (window.spritzAuth && window.spritzAuth.getToken()) || "";
   }
 
+  // --- account email (moved here from the header nav) ---
+  var emailEl = document.getElementById("account-email");
+  if (emailEl) {
+    var email = (window.spritzAuth && window.spritzAuth.getEmail()) || "";
+    emailEl.textContent = email || M("emailnone", "You are not logged in on this address.");
+  }
+
   // --- personal access token: show it (read-only) and offer a copy button ---
   var tokenBox = document.getElementById("token-box");
   if (tokenBox) {
