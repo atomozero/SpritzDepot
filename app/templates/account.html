@@ -6,9 +6,25 @@
          data-m-needlogin="{{ t('account.need_login') }}"
          data-m-wrongpw="{{ t('account.wrong_pw') }}"
          data-m-deleted="{{ t('account.deleted') }}"
-         data-m-error="{{ t('pub.error') }}">
+         data-m-error="{{ t('pub.error') }}"
+         data-m-copy="{{ t('account.token_copy') }}"
+         data-m-copied="{{ t('account.token_copied') }}"
+         data-m-tokennone="{{ t('account.token_none') }}">
   <h1>{{ t('account.title') }}</h1>
   <p class="lead">{{ t('account.lead') }}</p>
+
+  <section class="install">
+    <h2>{{ t('account.token_title') }}</h2>
+    <p class="hint">{{ t('account.token_hint') }}</p>
+    <p>
+      <textarea id="token-box" class="field" readonly rows="3"
+                style="width:100%; font-family:monospace; font-size:12px;"></textarea>
+    </p>
+    <p>
+      <button type="button" class="btn btn-fallback" id="token-copy">{{ t('account.token_copy') }}</button>
+      <span class="hint" id="token-status"></span>
+    </p>
+  </section>
 
   <section class="install">
     <h2>{{ t('privacy.rights_title') }}</h2>

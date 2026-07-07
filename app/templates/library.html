@@ -6,16 +6,11 @@
   <h1>{{ t('nav.my_apps') }}</h1>
   <p class="lead">{{ t('lib.page_lead') }}</p>
 
-  <section class="install">
-    <h2>{{ t('lib.login_heading') }}</h2>
-    <p class="hint">
-      <a href="/login">{{ t('nav.login') }}</a> &middot; {{ t('lib.login_hint') }}
-    </p>
-    <p>
-      <input type="text" id="token" placeholder="{{ t('lib.token_placeholder') }}"
-             class="field" style="max-width:520px;">
-      <button id="load" class="btn">{{ t('lib.show_button') }}</button>
-    </p>
+  {# Shown only when not logged in on this address (JS toggles it). The token is
+     managed in "My data" now, not here. #}
+  <section class="install" id="need-login" style="display:none;">
+    <p><a class="btn" href="/login">{{ t('nav.login') }}</a></p>
+    <p class="hint">{{ t('lib.need_login_hint') }}</p>
   </section>
 
   <section class="install" id="result" style="display:none;"
@@ -27,7 +22,6 @@
            data-msg-badtoken="{{ t('lib.bad_token') }}"
            data-msg-expired="{{ t('lib.session_expired') }}"
            data-msg-error="{{ t('lib.error') }}">
-    <h2>{{ t('nav.my_apps') }}</h2>
     <ul class="app-list" id="lib-list"></ul>
     <p class="empty" id="lib-empty" style="display:none;">{{ t('lib.empty') }}</p>
   </section>

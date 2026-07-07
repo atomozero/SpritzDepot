@@ -13,6 +13,25 @@
     return (window.spritzAuth && window.spritzAuth.getToken()) || "";
   }
 
+  // --- personal access token: show it (read-only) and offer a copy button ---
+  var tokenBox = document.getElementById("token-box");
+  if (tokenBox) {
+    var t0 = token();
+    tokenBox.value = t0 || M("tokennone", "Log in to see your token.");
+    var copyBtn = document.getElementById("token-copy");
+    if (copyBtn) {
+      if (!t0) copyBtn.disabled = true;
+      copyBtn.onclick = function () {
+        tokenBox.focus();
+        tokenBox.select();
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        var status = document.getElementById("token-status");
+        if (status) status.textContent = ok ? M("copied", "Copied") : "";
+      };
+    }
+  }
+
   // --- export (access + portability) ---
   document.getElementById("export-btn").onclick = function (e) {
     e.preventDefault();

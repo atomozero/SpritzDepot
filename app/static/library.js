@@ -1,59 +1,63 @@
-/* "My apps" page: fetch /library with the pasted bearer token and render the
- * list. Vanilla, old-JS friendly for WebPositive (XMLHttpRequest). */
+/* "My apps" page: fetch /library with the stored login token and render the
+ * list. The token lives in the login (spritzAuth), not a field on this page;
+ * managing it moved to "My data". Vanilla, old-JS friendly (XMLHttpRequest). */
 (function () {
   "use strict";
 
-  var btn = document.getElementById("load");
-  if (!btn) return;
-
-  // Labels come from data-* on #result so they can be translated server-side.
+  // Labels/messages come from data-* on #result so they can be translated.
   var R = document.getElementById("result");
+  if (!R) return;
   var STATE_LABEL = {
     pending: (R && R.getAttribute("data-s-pending")) || "in coda",
     installed: (R && R.getAttribute("data-s-installed")) || "installata",
     removed: (R && R.getAttribute("data-s-removed")) || "rimossa"
   };
   var REMOVE_LABEL = (R && R.getAttribute("data-s-remove")) || "Rimuovi";
-  // Translated alert messages from data-* on #result (English fallback).
   function M(name, fallback) {
     return (R && R.getAttribute("data-msg-" + name)) || fallback;
   }
 
-  // Prefill the token field from the stored login, if any.
-  if (window.spritzAuth && window.spritzAuth.getToken()) {
-    document.getElementById("token").value = window.spritzAuth.getToken();
+  function token() {
+    return (window.spritzAuth && window.spritzAuth.getToken()) || "";
   }
 
-  btn.onclick = function () {
-    var token = (document.getElementById("token").value || "").trim() ||
-                (window.spritzAuth ? window.spritzAuth.getToken() : "");
-    if (!token) { alert(M("login", "Log in first (link at the top).")); return; }
-
+  function load() {
+    var tok = token();
+    if (!tok) {
+      // Not logged in on this address: show the login prompt, hide the list.
+      var need = document.getElementById("need-login");
+      if (need) need.style.display = "block";
+      R.style.display = "none";
+      return;
+    }
     var xhr = new XMLHttpRequest();
     xhr.open("GET", "/library", true);
-    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.setRequestHeader("Authorization", "Bearer " + tok);
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
       if (xhr.status === 200) {
         render(JSON.parse(xhr.responseText));
       } else if (xhr.status === 401) {
-        alert(M("badtoken", "Invalid or expired token."));
+        // Token gone/expired: fall back to the login prompt.
+        var need = document.getElementById("need-login");
+        if (need) need.style.display = "block";
+        R.style.display = "none";
       } else {
         alert(M("error", "Error") + " (" + xhr.status + ").");
       }
     };
     xhr.send();
-  };
-
-  // If already logged in, load automatically on open.
-  if (window.spritzAuth && window.spritzAuth.getToken()) {
-    btn.click();
   }
+
+  // Load automatically on open.
+  load();
 
   function render(items) {
     var list = document.getElementById("lib-list");
     var empty = document.getElementById("lib-empty");
     list.innerHTML = "";
+    var need = document.getElementById("need-login");
+    if (need) need.style.display = "none";
     document.getElementById("result").style.display = "block";
 
     if (!items || items.length === 0) {
@@ -99,8 +103,7 @@
   }
 
   function removeFromLibrary(cid) {
-    var tok = (document.getElementById("token").value || "").trim() ||
-              (window.spritzAuth ? window.spritzAuth.getToken() : "");
+    var tok = token();
     if (!tok) return;
     var xhr = new XMLHttpRequest();
     xhr.open("POST", "/library/" + encodeURIComponent(cid) + "/remove", true);
@@ -108,7 +111,7 @@
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
       if (xhr.status >= 200 && xhr.status < 300) {
-        btn.click();  // reload the list
+        load();  // reload the list
       } else if (xhr.status === 401) {
         alert(M("expired", "Session expired, log in again."));
       }
