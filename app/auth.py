@@ -59,6 +59,8 @@ def make_token(user: User) -> str:
     payload = {
         "sub": str(user.id),
         "email": user.email,
+        "adm": bool(user.is_admin),  # so the UI can show the admin link; server
+                                     # authorization still re-checks is_admin
         "ver": user.token_version,   # invalidated when the user bumps this
         "exp": datetime.utcnow() + timedelta(minutes=TOKEN_TTL_MINUTES),
     }
