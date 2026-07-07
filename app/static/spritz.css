@@ -475,3 +475,24 @@ body.ui-modern .badge { border-radius: 999px; }
     background: #cbd5e1; border-radius: 4px;
   }
 }
+
+/* ============================================================================
+   RTL (Arabic): dir="rtl" on <html> already flips text alignment and flex flow.
+   These rules mirror the remaining hard-coded left/right margins so spacing
+   sits on the correct side. Attribute selector -> lite-safe (WebPositive too).
+   ============================================================================ */
+[dir="rtl"] .brand { margin-right: 0; margin-left: 18px; }
+[dir="rtl"] .search-inline { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .search-inline button { margin-left: 0; margin-right: 6px; }
+[dir="rtl"] .header-link { margin-left: 0; margin-right: 14px; }
+[dir="rtl"] .lang-picker { margin-left: 0; margin-right: 16px; }
+[dir="rtl"] .featured-icon { margin-right: 0; margin-left: 22px; }
+[dir="rtl"] .featured-cta { margin-left: 0; margin-right: 22px; }
+[dir="rtl"] .featured-carousel .featured-card { margin-right: 0; margin-left: 2%; }
+[dir="rtl"] .featured-carousel .featured-card:last-child { margin-left: 0; }
+[dir="rtl"] .also-in .source-list .badge { margin-left: 0; margin-right: 8px; }
+[dir="rtl"] .pager > * { margin-right: 0; margin-left: 12px; }
+[dir="rtl"] .pager > *:last-child { margin-left: 0; }
+/* Rounded search input: swap the flat corners for RTL. */
+[dir="rtl"] .search-big input { border-radius: 0 8px 8px 0; }
+[dir="rtl"] .search-big button { border-radius: 8px 0 0 8px; }

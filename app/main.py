@@ -156,6 +156,8 @@ def render(request: Request, template: str, ctx: Optional[dict] = None):
         # 'lite' (WebPositive/Haiku) or 'modern'; the base template turns this
         # into a body class so the CSS can layer modern styling as enhancement.
         "ui": uiprofile.ui_profile(request),
+        # True for right-to-left languages (Arabic): base.html sets dir="rtl".
+        "rtl": i18n.is_rtl(lang),
     }
     base.update(ctx or {})
     return templates.TemplateResponse(request, template, base)
