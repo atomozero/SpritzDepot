@@ -3,6 +3,7 @@ id: com.atomozero.teslaviewer
 name: TeslaViewer
 summary: Visualizzatore Haiku per registrazioni Tesla Sentry/Dashcam
 homepage: https://github.com/atomozero/TeslaViewer
+hvif_url: https://raw.githubusercontent.com/atomozero/TeslaViewer/main/Pendrive.hvif
 categories:
   - multimedia
   - video

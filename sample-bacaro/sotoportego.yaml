@@ -3,6 +3,7 @@ id: com.atomozero.sotoportego
 name: Sotoportego
 summary: Client VPN nativo per Haiku (OpenVPN)
 homepage: https://github.com/atomozero/Sotoportego
+hvif_url: https://raw.githubusercontent.com/atomozero/Sotoportego/main/Sotoportego.hvif
 categories:
   - network
   - internet
