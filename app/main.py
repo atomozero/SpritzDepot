@@ -1538,10 +1538,12 @@ def login_page(request: Request):
 
 
 @app.get("/library-page", response_class=HTMLResponse)
-def library_page(request: Request):
-    """'My apps' page: the user pastes their token; JS fetches /library and
-    renders the list. Reuses the existing JWT auth (no cookies)."""
-    return render(request, "library.html", {})
+def library_page(request: Request, session: Session = Depends(get_session)):
+    """'My apps' page: JS fetches /library and renders the user's list. Also
+    shows a static 'most downloaded' shelf (top 5), server-rendered so it is there
+    immediately regardless of login."""
+    top = _top_downloads(session, since_days=30, limit=5)
+    return render(request, "library.html", {"top_downloads": top})
 
 
 @app.get("/hvif-test", response_class=HTMLResponse)

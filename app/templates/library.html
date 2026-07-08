@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import app_icon %}
 {% block title %}{{ t('nav.my_apps') }} - spritz{% endblock %}
 
 {% block content %}
@@ -6,25 +7,52 @@
   <h1>{{ t('nav.my_apps') }}</h1>
   <p class="lead">{{ t('lib.page_lead') }}</p>
 
-  {# Shown only when not logged in on this address (JS toggles it). The token is
-     managed in "My data" now, not here. #}
-  <section class="install" id="need-login" style="display:none;">
-    <p><a class="btn" href="/login">{{ t('nav.login') }}</a></p>
-    <p class="hint">{{ t('lib.need_login_hint') }}</p>
-  </section>
+  {# Two columns: the user's library on the left, a "most downloaded" card on the
+     right. Stacks into one column on narrow screens (see .lib-layout in CSS). #}
+  <div class="lib-layout">
+    <div class="lib-main">
+      {# Shown only when not logged in on this address (JS toggles it). The token
+         is managed in "My data" now, not here. #}
+      <section class="install" id="need-login" style="display:none;">
+        <p><a class="btn" href="/login">{{ t('nav.login') }}</a></p>
+        <p class="hint">{{ t('lib.need_login_hint') }}</p>
+      </section>
 
-  <section class="install" id="result" style="display:none;"
-           data-s-remove="{{ t('lib.remove') }}"
-           data-s-pending="{{ t('lib.state.pending') }}"
-           data-s-installed="{{ t('lib.state.installed') }}"
-           data-s-removed="{{ t('lib.state.removed') }}"
-           data-msg-login="{{ t('lib.login_first') }}"
-           data-msg-badtoken="{{ t('lib.bad_token') }}"
-           data-msg-expired="{{ t('lib.session_expired') }}"
-           data-msg-error="{{ t('lib.error') }}">
-    <ul class="app-list" id="lib-list"></ul>
-    <p class="empty" id="lib-empty" style="display:none;">{{ t('lib.empty') }}</p>
-  </section>
+      <section class="install" id="result" style="display:none;"
+               data-s-remove="{{ t('lib.remove') }}"
+               data-s-pending="{{ t('lib.state.pending') }}"
+               data-s-installed="{{ t('lib.state.installed') }}"
+               data-s-removed="{{ t('lib.state.removed') }}"
+               data-msg-login="{{ t('lib.login_first') }}"
+               data-msg-badtoken="{{ t('lib.bad_token') }}"
+               data-msg-expired="{{ t('lib.session_expired') }}"
+               data-msg-error="{{ t('lib.error') }}">
+        <ul class="app-list" id="lib-list"></ul>
+        <p class="empty" id="lib-empty" style="display:none;">{{ t('lib.empty') }}</p>
+      </section>
+    </div>
+
+    {% if top_downloads %}
+    <aside class="lib-side">
+      <section class="install">
+        <h2 class="shelf-title">{{ t('home.top_month') }}</h2>
+        <ul class="side-list">
+          {% for app in top_downloads %}
+          <li>
+            <a class="side-item" href="/app/{{ app.id }}">
+              {{ app_icon(app, 'side-icon') }}
+              <span class="side-text">
+                <span class="side-name">{{ loop.index }}. {{ app.name }}</span>
+                <span class="badge badge-downloads" title="{{ t('home.downloads_title') }}">&#8595; {{ app.downloads }}</span>
+              </span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+    </aside>
+    {% endif %}
+  </div>
 </article>
 
 <script src="/static/library.js"></script>

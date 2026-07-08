@@ -1,0 +1,10 @@
+{# Shared template macros. Import with:  {% from "_macros.html" import app_icon %} #}
+
+{% macro app_icon(app, cls) %}
+  {% if app.icon %}
+  <img class="{{ cls }}" src="{{ app.icon }}" alt="">
+  {% else %}
+  <img class="{{ cls }}" src="/icon/{{ app.id }}" alt="" data-hvif="{{ app.id }}"
+       onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
+  {% endif %}
+{% endmacro %}

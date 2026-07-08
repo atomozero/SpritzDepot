@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import app_icon %}
 {% block title %}spritz: catalogo software per Haiku{% endblock %}
 
 {% macro app_card(app) %}
@@ -39,14 +40,6 @@
 </li>
 {% endmacro %}
 
-{% macro app_icon(app, cls) %}
-  {% if app.icon %}
-  <img class="{{ cls }}" src="{{ app.icon }}" alt="">
-  {% else %}
-  <img class="{{ cls }}" src="/icon/{{ app.id }}" alt="" data-hvif="{{ app.id }}"
-       onerror="this.onerror=null;this.src='/placeholder.svg?name={{ app.name|urlencode }}';">
-  {% endif %}
-{% endmacro %}
 
 {% block content %}
 <section class="hero">

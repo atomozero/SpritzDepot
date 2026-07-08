@@ -188,7 +188,7 @@ seed_cicheto("repo.haikuports.gizmo", "gizmo", "haikuports", version="1.0-1")
 
 # mock the live ombra lookup: the author's latest tag is newer (2.5)
 _orig_ombra = main._ombra_version
-main._ombra_version = lambda raw: "2.5" if (raw or {}).get("id") == "com.me.gizmo" else _orig_ombra(raw)
+main._ombra_version = lambda session, cid, raw: "2.5" if (raw or {}).get("id") == "com.me.gizmo" else _orig_ombra(session, cid, raw)
 main._OMBRA_VERSION_CACHE.clear()
 try:
     with Session(engine) as s:
@@ -199,7 +199,7 @@ try:
     print("ombra copy joins compare and can be the newest -> ok")
 
     # if the live lookup fails (returns None), the ombra copy is skipped, not guessed
-    main._ombra_version = lambda raw: None
+    main._ombra_version = lambda session, cid, raw: None
     main._OMBRA_VERSION_CACHE.clear()
     with Session(engine) as s:
         res5 = main._also_in_sources(s, s.get(CichetoRow, "repo.haikuports.gizmo"))

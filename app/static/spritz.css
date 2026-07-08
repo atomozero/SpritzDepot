@@ -200,6 +200,30 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .lib-card .btn-remove { padding: 5px 12px; font-size: 13px; }
 .lib-card .btn-remove:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
 
+/* Two-column layout: library on the left, a "most downloaded" card on the right.
+   Flex row (WebPositive-safe); the right column has a fixed-ish width. */
+.lib-layout { display: flex; flex-wrap: wrap; align-items: flex-start; }
+.lib-main { flex: 1 1 auto; min-width: 0; margin-right: 24px; }
+.lib-side { flex: 0 0 300px; max-width: 300px; }
+.lib-side .install { margin-top: 0; }
+/* Compact vertical list for the sidebar (not the 4-up card grid). */
+.side-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.side-list li { border-bottom: 1px solid #eef2f7; }
+.side-list li:last-child { border-bottom: 0; }
+.side-item { display: flex; align-items: center; padding: 10px 4px; color: inherit; }
+.side-item:hover { text-decoration: none; }
+.side-icon { width: 36px; height: 36px; border-radius: 9px; margin-right: 12px;
+  flex-shrink: 0; box-shadow: 0 1px 3px rgba(15,23,42,0.15); }
+.side-text { flex: 1 1 auto; min-width: 0; display: flex; align-items: center;
+  justify-content: space-between; }
+.side-name { font-size: 14px; font-weight: 600; color: #0f172a; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+/* On narrow screens the sidebar drops below the library, full width. */
+@media (max-width: 720px) {
+  .lib-main { margin-right: 0; }
+  .lib-side { flex: 1 1 100%; max-width: none; margin-top: 20px; }
+}
+
 /* ---------- "Available also in" (same app, multiple repos) ---------- */
 .also-in .source-list { list-style: none; padding: 0; margin: 10px 0 0; }
 .also-in .source-list li { padding: 8px 0; border-bottom: 1px solid #eef2f7; }
