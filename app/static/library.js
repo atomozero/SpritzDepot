@@ -69,35 +69,58 @@
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       var li = document.createElement("li");
-      li.className = "app-card";
+      li.className = "app-card lib-card";
 
+      // Icon + name, laid out like the catalog cards. The icon is the /icon PNG
+      // with an onerror -> placeholder, plus data-hvif so icon.js can upgrade it
+      // to a crisp SVG client-side (same as the catalog).
       var a = document.createElement("a");
-      a.className = "app-link";
+      a.className = "app-link app-link-row";
       a.href = "/app/" + encodeURIComponent(it.cicheto);
+
+      var img = document.createElement("img");
+      img.className = "app-icon-sm";
+      img.setAttribute("alt", "");
+      img.src = "/icon/" + encodeURIComponent(it.cicheto);
+      img.setAttribute("data-hvif", it.cicheto);
+      (function (name) {
+        img.onerror = function () {
+          img.onerror = null;
+          img.src = "/placeholder.svg?name=" + encodeURIComponent(name);
+        };
+      })(it.name || it.cicheto);
+      a.appendChild(img);
+
+      var txt = document.createElement("span");
+      txt.className = "app-link-text";
       var nm = document.createElement("span");
       nm.className = "app-name";
       nm.appendChild(document.createTextNode(it.name || it.cicheto));
-      a.appendChild(nm);
+      txt.appendChild(nm);
+      a.appendChild(txt);
       li.appendChild(a);
 
+      // Meta: channel + a state pill with its own colour, then the remove button
+      // on its own line so it does not crowd the badges.
       var meta = document.createElement("div");
       meta.className = "app-meta";
       meta.appendChild(badge("badge-channel", it.channel));
       if (it.arch) meta.appendChild(badge("badge", it.arch));
-      meta.appendChild(badge("badge-bridge", STATE_LABEL[it.state] || it.state));
+      meta.appendChild(badge("badge-state badge-state-" + it.state,
+                             STATE_LABEL[it.state] || it.state));
+      li.appendChild(meta);
 
+      var actions = document.createElement("div");
+      actions.className = "lib-actions";
       var rm = document.createElement("button");
-      rm.className = "btn btn-danger";
-      rm.style.marginLeft = "8px";
-      rm.style.padding = "3px 10px";
-      rm.style.fontSize = "13px";
+      rm.className = "btn btn-fallback btn-remove";
       rm.textContent = REMOVE_LABEL;
       rm.onclick = (function (cid) {
         return function () { removeFromLibrary(cid); };
       })(it.cicheto);
-      meta.appendChild(rm);
+      actions.appendChild(rm);
+      li.appendChild(actions);
 
-      li.appendChild(meta);
       list.appendChild(li);
     }
   }

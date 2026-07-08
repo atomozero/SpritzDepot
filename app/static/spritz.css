@@ -187,6 +187,19 @@ a.badge-bacaro:hover { background: #e2e8f0; text-decoration: none; }
 .badge-downloads { background: #fef3c7; border-color: #fde68a; color: #92400e; font-weight: 700; }
 .badge-multi { background: #e0e7ff; border-color: #c7d2fe; color: #4338ca; font-weight: 600; }
 
+/* ---------- Library ("My apps") state pills + card actions ---------- */
+/* State-specific colours so the queue state reads at a glance, instead of the
+   recycled green bridge badge. */
+.badge-state { font-weight: 600; }
+.badge-state-pending   { background: #fef3c7; border-color: #fde68a; color: #92400e; }  /* queued: amber */
+.badge-state-installed { background: #dcfce7; border-color: #bbf7d0; color: #15803d; }  /* installed: green */
+.badge-state-removed   { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }  /* removed: grey */
+.badge-state-unavailable { background: #fee2e2; border-color: #fecaca; color: #b91c1c; }
+/* Remove button sits on its own row under the meta, not crowding the badges. */
+.lib-card .lib-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef2f7; }
+.lib-card .btn-remove { padding: 5px 12px; font-size: 13px; }
+.lib-card .btn-remove:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+
 /* ---------- "Available also in" (same app, multiple repos) ---------- */
 .also-in .source-list { list-style: none; padding: 0; margin: 10px 0 0; }
 .also-in .source-list li { padding: 8px 0; border-bottom: 1px solid #eef2f7; }
