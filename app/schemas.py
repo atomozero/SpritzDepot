@@ -101,6 +101,11 @@ class Cicheto(BaseModel):
     license: Optional[str] = Field(default=None, max_length=200)
     categories: list[str] = Field(default_factory=list, max_length=64)
     icon: Optional[HttpUrl] = None
+    # URL to a raw HVIF icon blob (the Haiku vector format, 'ncif' magic). spritz
+    # serves it via /hvif/{id} and the frontend renders it to SVG client-side, so
+    # an app that ships an .hvif (but no extractable hpkg icon, e.g. zip releases)
+    # can still show its real vector icon. Takes precedence over hpkg extraction.
+    hvif_url: Optional[HttpUrl] = None
     screenshots: list[HttpUrl] = Field(default_factory=list, max_length=32)
 
     author: Optional[Author] = None

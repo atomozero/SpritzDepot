@@ -1736,8 +1736,15 @@ def app_hvif(request: Request, cicheto_id: str,
 
 
 def _extract_hvif_blob(row: CichetoRow) -> Optional[bytes]:
-    """This cichéto's own raw HVIF blob from its hpkg, or None if there is no
-    hpkg to pull from or the extraction fails. No hvif2png needed."""
+    """This cichéto's raw HVIF blob, or None. Prefers an explicit `hvif_url` in
+    the manifest (an app can point at a .hvif it ships, e.g. zip releases with no
+    extractable hpkg icon); otherwise extracts from the app's hpkg. No hvif2png."""
+    hvif_url = (row.raw or {}).get("hvif_url")
+    if hvif_url:
+        blob = _fetch_hvif_url(hvif_url)
+        if blob is not None:
+            return blob
+        # fall through to hpkg extraction if the declared URL failed
     url = _hpkg_url_for_icon(row)
     if not url:
         return None
@@ -1745,6 +1752,25 @@ def _extract_hvif_blob(row: CichetoRow) -> Optional[bytes]:
         return hvif.hvif_blob_from_hpkg_url(url)
     except hvif.IconError:
         return None
+
+
+def _fetch_hvif_url(url: str) -> Optional[bytes]:
+    """Download a raw HVIF blob from an explicit manifest URL (guarded, size
+    capped), validating the 'ncif' magic. None on any problem so the caller can
+    fall back. The blob is small (a vector icon), so a tight cap is fine."""
+    try:
+        with netguard.stream_guarded("GET", url, timeout=15.0) as r:
+            r.raise_for_status()
+            data = bytearray()
+            for chunk in r.iter_bytes(1 << 16):
+                data.extend(chunk)
+                if len(data) > 256 * 1024:      # an icon is never this big
+                    return None
+    except Exception:
+        return None
+    if bytes(data[:4]) != b"ncif":              # not an HVIF file
+        return None
+    return bytes(data)
 
 
 def _borrow_twin_hvif(session: Session, row: CichetoRow) -> Optional[bytes]:

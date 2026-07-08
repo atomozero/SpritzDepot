@@ -3,6 +3,7 @@ id: com.atomozero.localsend
 name: LocalSend
 summary: Condividi file sulla LAN con qualsiasi dispositivo, client nativo Haiku
 homepage: https://github.com/atomozero/LocalSend
+hvif_url: https://raw.githubusercontent.com/atomozero/LocalSend/main/ApeCar.hvif
 categories:
   - network
   - utilities
