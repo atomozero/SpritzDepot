@@ -81,14 +81,17 @@
       var img = document.createElement("img");
       img.className = "app-icon-sm";
       img.setAttribute("alt", "");
-      img.src = "/icon/" + encodeURIComponent(it.cicheto);
       img.setAttribute("data-hvif", it.cicheto);
+      // Set onerror BEFORE src: assigning src starts the load immediately, and a
+      // fast 404 (e.g. an app with no extractable icon) could fire before a
+      // later-assigned handler, leaving a broken image. Handler first, src last.
       (function (name) {
         img.onerror = function () {
           img.onerror = null;
           img.src = "/placeholder.svg?name=" + encodeURIComponent(name);
         };
       })(it.name || it.cicheto);
+      img.src = "/icon/" + encodeURIComponent(it.cicheto);
       a.appendChild(img);
 
       var txt = document.createElement("span");
@@ -123,6 +126,9 @@
 
       list.appendChild(li);
     }
+    // These cards were injected after DOMContentLoaded, so icon.js has not seen
+    // them yet: trigger the HVIF -> SVG upgrade on the new icons.
+    if (window.spritzIcons) window.spritzIcons.run();
   }
 
   function removeFromLibrary(cid) {

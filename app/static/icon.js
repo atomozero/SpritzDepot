@@ -62,9 +62,20 @@
   }
 
   function run() {
+    // Only upgrade images not yet processed (mark them so a re-run is cheap and
+    // idempotent when called again after new cards are injected).
     var imgs = document.querySelectorAll("img[data-hvif]");
-    for (var i = 0; i < imgs.length; i++) upgrade(imgs[i]);
+    for (var i = 0; i < imgs.length; i++) {
+      var img = imgs[i];
+      if (img.getAttribute("data-hvif-done")) continue;
+      img.setAttribute("data-hvif-done", "1");
+      upgrade(img);
+    }
   }
+
+  // Expose run() so code that injects icons later (the library list, built by XHR
+  // after DOMContentLoaded) can trigger the HVIF -> SVG upgrade on its new cards.
+  window.spritzIcons = { run: run };
 
   if (document.addEventListener) {
     document.addEventListener("DOMContentLoaded", run);
