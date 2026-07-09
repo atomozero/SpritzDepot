@@ -1,5 +1,7 @@
 # spritz registry (v0.1)
 
+[![tests](https://github.com/atomozero/spritz_server/actions/workflows/tests.yml/badge.svg)](https://github.com/atomozero/spritz_server/actions/workflows/tests.yml)
+
 A federated catalog and installer for Haiku OS software. It covers what
 HaikuDepot does not: the latest release of an app, straight from its author
 (GitHub releases, BeSly, Fat Elk, third-party Haiku repos, old archives).
@@ -39,6 +41,9 @@ pip install -r requirements.txt
 python seed.py                 # seed the cache from the local sample bàcaro
 uvicorn app.main:app --reload  # then open http://localhost:8000/docs
 ```
+
+Copy `.env.example` to `.env` to override defaults (in `dev` all have working
+fallbacks). Contributing? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Tests live in `tests/` as runnable scripts. Run the whole suite under pytest
 (each script runs isolated in its own subprocess, on a throwaway DB); this is
