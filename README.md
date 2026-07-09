@@ -224,3 +224,9 @@ L'utente può esercitare i propri diritti dall'interfaccia:
   disegnare le icone delle app come SVG nel browser (endpoint `/hvif/{id}` che
   serve il blob HVIF grezzo), senza dipendere dal tool nativo `hvif2png`. Il
   rendering PNG lato server (`hvif2png` + `/icon/{id}`) resta come alternativa.
+
+## Licenza
+
+spritz è rilasciato sotto licenza **MIT** (vedi il file [LICENSE](LICENSE)).
+Copyright (c) 2026 Andrea Bernardi. Include codice di terze parti sotto la
+propria licenza MIT (vedi la sezione "Componenti di terze parti" sopra).
