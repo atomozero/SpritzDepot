@@ -1,6 +1,6 @@
 # spritz registry (v0.1)
 
-[![tests](https://github.com/atomozero/spritz_server/actions/workflows/tests.yml/badge.svg)](https://github.com/atomozero/spritz_server/actions/workflows/tests.yml)
+[![tests](https://github.com/atomozero/SpritzDepot/actions/workflows/tests.yml/badge.svg)](https://github.com/atomozero/SpritzDepot/actions/workflows/tests.yml)
 
 A federated catalog and installer for Haiku OS software. It covers what
 HaikuDepot does not: the latest release of an app, straight from its author
