@@ -11,3 +11,6 @@ slowapi
 jinja2
 alembic
 zstandard
+# Postgres driver for production (SPRITZ_DB_URL=postgresql+psycopg://...).
+# Optional for dev (SQLite needs no driver); required when deploying on Postgres.
+psycopg[binary]

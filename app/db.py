@@ -14,7 +14,12 @@ DATABASE_URL = os.environ.get("SPRITZ_DB_URL", "sqlite:///./spritz.db")
 # check_same_thread=False is only needed for SQLite + FastAPI's threadpool.
 _IS_SQLITE = DATABASE_URL.startswith("sqlite")
 _connect_args = {"check_same_thread": False} if _IS_SQLITE else {}
-engine = create_engine(DATABASE_URL, echo=False, connect_args=_connect_args)
+# For a long-lived Postgres deploy: pre_ping drops dead connections (server
+# restart, idle timeout) instead of handing a stale one to a request; recycle
+# caps connection age. No effect on SQLite (single-file, no pool to speak of).
+_engine_kw = {} if _IS_SQLITE else {"pool_pre_ping": True, "pool_recycle": 1800}
+engine = create_engine(DATABASE_URL, echo=False, connect_args=_connect_args,
+                       **_engine_kw)
 
 
 def _sqlite_path(url: str) -> str:
@@ -70,16 +75,25 @@ if _IS_SQLITE:
             cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA busy_timeout=5000")
         cur.execute("PRAGMA synchronous=NORMAL")
+        # Enforce foreign keys (off by default in SQLite): the library.user_id ->
+        # users.id reference should actually be checked.
+        cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
 
 
 def init_db() -> None:
-    """Create tables. Called once at startup.
+    """Ensure the schema exists. Called once at startup.
 
-    Import models first so every table is registered on SQLModel.metadata
-    before create_all, regardless of import order at the call site.
+    In dev/test this create_all's the tables (convenient, no migration step). In
+    prod the schema is owned by Alembic (`alembic upgrade head`), so create_all is
+    skipped: running it against a migrated DB masks schema drift and can conflict
+    with Alembic's view of the tables. Import models first so every table is
+    registered on SQLModel.metadata before create_all.
     """
     from . import models  # noqa: F401  (registers tables as a side effect)
+    from . import config
+    if config.IS_PROD:
+        return  # schema managed by Alembic in production
     SQLModel.metadata.create_all(engine)
 
 

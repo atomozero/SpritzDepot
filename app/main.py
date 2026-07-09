@@ -931,10 +931,13 @@ def _resolve_ombra(session: Session, cicheto_id: str, raw: dict, ch: dict,
         artifacts = {a: {"url": url} for a, url in res.artifacts.items()}
         version = res.version
         # Best-effort snapshot refresh (never let a cache write break resolve).
+        # Commit it, otherwise the added row is discarded and every request
+        # re-resolves live against GitHub instead of caching.
         try:
             ombra_crawler.resolve_and_snapshot(session, cicheto_id, raw)
+            session.commit()
         except Exception:
-            pass
+            session.rollback()
 
     if arch and arch not in artifacts:
         raise HTTPException(404, f"no ombra asset for arch '{arch}'")
