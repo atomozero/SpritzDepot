@@ -1,0 +1,5 @@
+# Test/CI dependencies. Install on top of requirements.txt:
+#   pip install -r requirements.txt -r requirements-dev.txt
+# Runtime deps stay in requirements.txt; pytest is not needed in production.
+-r requirements.txt
+pytest

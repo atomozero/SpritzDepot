@@ -40,8 +40,17 @@ python seed.py                 # seed the cache from the local sample bàcaro
 uvicorn app.main:app --reload  # then open http://localhost:8000/docs
 ```
 
-Tests live in `tests/` and are runnable scripts; run them as modules from the
-repo root (in-process, no network unless noted):
+Tests live in `tests/` as runnable scripts. Run the whole suite under pytest
+(each script runs isolated in its own subprocess, on a throwaway DB); this is
+what CI runs:
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+Or run a single script directly, as a module from the repo root (in-process,
+no network unless noted):
 
 ```bash
 python -m tests.test_flow       # end-to-end catalog + library flow
@@ -94,7 +103,7 @@ app/
   templates/     Jinja pages
   static/        frontend CSS + JS
 sample-bacaro/   sample cichéto (Genio)
-tests/           runnable test scripts (python -m tests.test_x) + fixtures/
+tests/           runnable test scripts + test_scripts.py (pytest wrapper) + fixtures/
 ```
 
 ## Key endpoints
