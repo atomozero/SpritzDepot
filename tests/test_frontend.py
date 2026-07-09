@@ -4,7 +4,7 @@ Renders the home, a search, an app page, and the static assets, asserting the
 key elements task 03 requires: search box, HaikuPorts bridge badge/note, the
 install section with channels, and the degrading-button script.
 
-    SPRITZ_SECRET=x SPRITZ_ADMIN_TOKEN=t python test_frontend.py
+    SPRITZ_SECRET=x SPRITZ_ADMIN_TOKEN=t python -m tests.test_frontend
 """
 import os
 

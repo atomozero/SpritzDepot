@@ -30,7 +30,7 @@ except HeapError:
     pass
 print("heap decompress    -> ok (none/zlib/zstd/unsupported)")
 
-FIXTURE = (Path(__file__).parent / "tests" / "fixtures"
+FIXTURE = (Path(__file__).parent / "fixtures"
            / "minecraft_installer-1.3.2-1-x86_64.hpkg")
 
 data = FIXTURE.read_bytes()

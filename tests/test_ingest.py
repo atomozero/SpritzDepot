@@ -13,7 +13,7 @@ os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 # Use a throwaway DB, NOT the real catalog. This test does a delete-all "clean
 # slate" below; without the guard it would wipe spritz.db (the catalog the
 # project explicitly protects).
-import test_db_guard  # noqa: E402
+from tests import test_db_guard  # noqa: E402
 test_db_guard.use_throwaway_db("test_ingest")
 
 from app.db import init_db, engine  # noqa: E402

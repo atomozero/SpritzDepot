@@ -4,7 +4,7 @@ Runs in-process (FastAPI TestClient), no network, no long-running server.
 Run with the admin token set:
 
     SPRITZ_ENV=dev SPRITZ_SECRET=x SPRITZ_ADMIN_TOKEN=test-admin-secret-123 \
-        python test_security.py
+        python -m tests.test_security
 """
 import os
 

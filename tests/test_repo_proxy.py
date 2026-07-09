@@ -6,7 +6,7 @@ server, points a cichéto at it (with the real sha256), then drives:
   GET  .../repo.info, .../repo, .../packages/<file>
 
 Requires the host-built Haiku tools. Point at them with:
-  SPRITZ_PACKAGE_REPO_BIN=/path/to/tools/package_repo/package_repo python test_repo_proxy.py
+  SPRITZ_PACKAGE_REPO_BIN=/path/to/tools/package_repo/package_repo python -m tests.test_repo_proxy
 The `package` tool and the shared libs must sit in the sibling layout the
 spike produces (tools/package/package and lib/ two levels up).
 """

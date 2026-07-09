@@ -11,7 +11,7 @@ os.environ.setdefault("SPRITZ_ENV", "dev")
 os.environ.setdefault("SPRITZ_SECRET", "x")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
-import test_db_guard  # noqa: E402
+from tests import test_db_guard  # noqa: E402
 test_db_guard.use_throwaway_db("test_uiprofile")
 
 from app import uiprofile

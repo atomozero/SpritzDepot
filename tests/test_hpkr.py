@@ -13,13 +13,13 @@ os.environ.setdefault("SPRITZ_SECRET", "x")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
 # This test merges rows into the DB; use a throwaway, never the real catalog.
-import test_db_guard  # noqa: E402
+from tests import test_db_guard  # noqa: E402
 test_db_guard.use_throwaway_db("test_hpkr")
 
 from pathlib import Path
 from app import hpkr
 
-FIXTURE = Path(__file__).parent / "tests" / "fixtures" / "sample.hpkr"
+FIXTURE = Path(__file__).parent / "fixtures" / "sample.hpkr"
 
 blob = FIXTURE.read_bytes()
 pkgs = hpkr.parse_catalog(blob)

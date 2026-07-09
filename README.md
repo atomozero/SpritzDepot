@@ -40,13 +40,14 @@ python seed.py                 # seed the cache from the local sample bàcaro
 uvicorn app.main:app --reload  # then open http://localhost:8000/docs
 ```
 
-Tests (in-process, no network unless noted):
+Tests live in `tests/` and are runnable scripts; run them as modules from the
+repo root (in-process, no network unless noted):
 
 ```bash
-python test_flow.py       # end-to-end catalog + library flow
-python test_security.py   # auth, rate-limit, validation, prod gate
-python test_frontend.py   # page rendering
-SPRITZ_PACKAGE_REPO_BIN=... python test_repo_proxy.py  # repo-proxy (needs package_repo)
+python -m tests.test_flow       # end-to-end catalog + library flow
+python -m tests.test_security   # auth, rate-limit, validation, prod gate
+python -m tests.test_frontend   # page rendering
+SPRITZ_PACKAGE_REPO_BIN=... python -m tests.test_repo_proxy  # repo-proxy (needs package_repo)
 ```
 
 ## Configuration
@@ -93,6 +94,7 @@ app/
   templates/     Jinja pages
   static/        frontend CSS + JS
 sample-bacaro/   sample cichéto (Genio)
+tests/           runnable test scripts (python -m tests.test_x) + fixtures/
 ```
 
 ## Key endpoints

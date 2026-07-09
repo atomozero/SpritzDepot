@@ -12,7 +12,7 @@ os.environ.setdefault("SPRITZ_SECRET", "test-secret")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
 # This test merges rows into the DB; use a throwaway, never the real catalog.
-import test_db_guard  # noqa: E402
+from tests import test_db_guard  # noqa: E402
 test_db_guard.use_throwaway_db("test_ombra")
 
 from app import ombra

@@ -13,7 +13,7 @@ os.environ.setdefault("SPRITZ_SECRET", "x")
 os.environ.setdefault("SPRITZ_ADMIN_TOKEN", "t")
 
 # Merges rows into the DB; use a throwaway, never the real catalog.
-import test_db_guard  # noqa: E402
+from tests import test_db_guard  # noqa: E402
 test_db_guard.use_throwaway_db("test_ombra_crawler")
 
 from datetime import datetime, timedelta

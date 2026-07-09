@@ -26,7 +26,7 @@ that instead.
 Run the end-to-end test (no network, in-process):
 
 ```bash
-python test_flow.py
+python -m tests.test_flow
 ```
 
 ### Database migrations
