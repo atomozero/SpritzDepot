@@ -1549,15 +1549,6 @@ def library_page(request: Request, session: Session = Depends(get_session)):
     return render(request, "library.html", {"top_downloads": top})
 
 
-@app.get("/hvif-test", response_class=HTMLResponse)
-def hvif_test_page(request: Request):
-    """Throwaway diagnostic: does the client-side HVIF parser/renderer
-    (haikon_full.js) run in the visitor's browser? Renders a real HVIF to SVG and
-    logs each step on the page, so WebPositive compatibility can be checked
-    without a devtools console. Standalone template (does not extend base)."""
-    return templates.TemplateResponse(request, "hvif_test.html", {})
-
-
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     """Privacy notice (GDPR arts. 13-14): what data spritz stores, the legal
