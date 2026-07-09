@@ -1,232 +1,167 @@
-# spritz registry: server (v0.1)
+# spritz registry (v0.1)
 
-Backend del catalogo/store per l'installazione di software su Haiku OS.
-Modello **Opzione B**: il web genera install, il demone Haiku le esegue.
+A federated catalog and installer for Haiku OS software. It covers what
+HaikuDepot does not: the latest release of an app, straight from its author
+(GitHub releases, BeSly, Fat Elk, third-party Haiku repos, old archives).
 
-## Cosa fa già
+spritz is **additive to HaikuPorts, never a rival or a fork**: dependencies are
+resolved by the system solver against the repos already present, and every app
+can declare a `bridge` to its curated HaikuPorts package. Think AUR to the
+official Arch repos, the nursery, not the competitor.
 
-- **Ingest misto git + cache.** Un *bàcaro* è un repo git di file YAML (*cichéti*).
-  Il server li clona, li valida contro lo schema e li proietta in una cache DB
-  interrogabile. Git = fonte di verità, DB = proiezione ricostruibile. L'ingest
-  fa pruning: i cichéti spariti da un bàcaro vengono rimossi dalla cache, così
-  la proiezione resta fedele. L'attribuzione al bàcaro usa lo slug del crawl,
-  non il packager dichiarato, così un cichéto non può rubare le righe altrui.
-- **Catalogo pubblico.** `/search`, `/cicheto/{id}`.
-- **Account email + password.** `/auth/register`, `/auth/login` (JWT bearer).
-- **Resolve per il demone.** `/resolve/{id}?channel=&arch=` → url + sha256 + requires.
-  Per il canale **ombra** (`source: github-latest`) gli URL sono risolti al volo
-  sull'ultima release GitHub dell'autore, senza sha256 pre-calcolato (il client
-  verifica l'hash al download). È la cosa che un repo HPKR statico non può fare.
-- **Libreria / coda (effetto Play Store).** L'utente accoda da browser
-  (`POST /library/{id}`); il demone Haiku fa polling di `/library/pending`,
-  installa, poi conferma con `/library/{id}/installed`.
-- **Layer repo-proxy (compatibile HaikuDepot).** Raggruppa i cichéti del canale
-  stable per (vendor, arch), scarica gli hpkg dell'autore verificando lo sha256,
-  e genera un catalogo HPKR con `package_repo`. Le route
-  `/repo/{vendor}/{arch}/current/...` servono `repo.info` (con un `identifier`
-  UUID stabile), il catalogo e gli hpkg, così basta aggiungere un URL in
-  HaikuDepot. Il rebuild è automatico all'`/ingest` (oppure `POST /repo/build`
-  on demand). Un sub-repo per vendor, perché `package_repo` impone che tutti i
-  pacchetti di un repo abbiano lo stesso vendor (vedi `docs/DECISIONS.md`).
-- **Frontend web (server-rendered, in italiano).** Home con ricerca e filtri
-  (categoria, bàcaro), pagina app con i canali, la nota bridge HaikuPorts e il
-  bottone che degrada: prova a contattare il client nativo (`spritz://` in un
-  clic) e altrimenti offre il repository da aggiungere in HaikuDepot. I badge
-  categoria e bàcaro sono cliccabili; c'è una pagina `/categories` per sfogliare.
-  Template Jinja leggeri, pensati per WebPositive.
-- **Icone delle app** (`/icon/{id}`). Estrae l'icona HVIF dall'hpkg dell'app, la
-  converte in PNG (via `hvif2png`) e la mette in cache. On-demand, con un limite
-  di dimensione per non scaricare hpkg enormi solo per l'icona: oltre soglia (o
-  senza il tool) il frontend mostra un placeholder con l'iniziale.
-- **Pagina di pubblicazione** (`/publish`, autenticata). L'autore compila un
-  form e ottiene un file cichéto YAML da mettere nel proprio bàcaro git. Non
-  scrive nulla lato server (git resta la fonte di verità): valida con lo stesso
-  schema dell'ingest, quindi il file generato si re-ingesta sempre pulito.
-- **Login nel browser** (`/login`). Form accedi/registrati: il sito chiama
-  `/auth/login` o `/auth/register`, salva il JWT in localStorage e lo allega da
-  solo alle pagine protette (libreria, pubblica). Niente piu' token da incollare;
-  l'header mostra "Accedi" o l'email con "Esci".
-- **Pagina admin** (`/admin`). Incolli il token admin e gestisci i bàcari dal
-  web: ingest, ri-crawl in un clic (l'URL git resta memorizzato), rebuild dei
-  repo HaikuDepot, elenco con esito dell'ultimo crawl. La pagina è visibile ma
-  inerte senza token; ogni azione è verificata dal server.
-- **Canale ombra (segue l'autore).** Per i canali `github-latest`, spritz
-  risolve l'ultima release GitHub dell'autore: trova gli asset .hpkg per arch col
-  pattern del cichéto e ne restituisce gli URL. Non costruisce pacchetti e non
-  pre-calcola l'hash (lo verifica il client al download). Un crawler
-  (`crawl_ombra.py`, oppure `POST /admin/crawl-ombra`) prefetcha la risoluzione
-  in una cache (tabella `ombra_snapshots`): i percorsi di lettura servono dallo
-  snapshot quando è fresco e cadono sulla risoluzione live (aggiornando lo
-  snapshot) solo se manca o è scaduto, così non serve colpire GitHub a ogni
-  richiesta. `SPRITZ_GITHUB_TOKEN` alza il rate limit anonimo.
-- **Canale hpkr-repo (repo di terze parti).** Per un repository Haiku di terze
-  parti (NON HaikuPorts: BeSly, Fat Elk, il server dell'autore), spritz legge il
-  catalogo HPKR (`hpkr.py`, parser in puro Python verificato contro l'output di
-  `package_repo`), trova il pacchetto e ne compone l'URL `baseUrl + nome-versione-arch.hpkg`.
-  E' il gap che HaikuDepot non copre di default. `POST /repo/import-hpkr`
-  (admin) importa in un colpo tutto un repo di terze parti: legge il catalogo e
-  crea un cichéto hpkr-repo per ogni pacchetto (rifiuta gli URL HaikuPorts, che
-  vanno in bridge).
+This repo is the **registry server** (FastAPI): discovery plus the two install
+paths. The install queue and native `spritz://` handler live in a separate
+Haiku-side daemon (not in this repo).
 
-## Avvio
+## Core concepts
+
+- **cichéto**: an app manifest, a small YAML file. Schema in `app/schemas.py`.
+- **bàcaro**: a tap, a git repo of cichéti. Git is the source of truth; the DB
+  is a rebuildable projection.
+- **channels**: `stable` (pinned + sha256) and `ombra` (follows the author's
+  latest GitHub release).
+- **bridge**: links an app to its HaikuPorts package.
+
+## Two install paths
+
+- **stable → repo-proxy.** A standard Haiku repository (`repo.info` + HPKR
+  catalog) built with `package_repo`, served under `/repo/{vendor}/{arch}/...`.
+  The user adds one URL in HaikuDepot, no new client needed. One sub-repo per
+  vendor (a `package_repo` constraint, see `docs/DECISIONS.md`).
+- **ombra + third-party hpkr + browser queue → native client.** A static HPKR
+  repo cannot follow an author's latest release, so `ombra` resolves it live
+  and the native daemon consumes the browser install queue.
+
+## Running
 
 ```bash
 pip install -r requirements.txt
-python seed.py                 # popola la cache dal sample-bacaro locale
-uvicorn app.main:app --reload  # poi apri http://localhost:8000/docs
+python seed.py                 # seed the cache from the local sample bàcaro
+uvicorn app.main:app --reload  # then open http://localhost:8000/docs
 ```
 
-`python test_flow.py` esercita l'intero flusso in-process senza rete.
-`python test_security.py` verifica auth, rate-limit, validazione e blocco prod.
-`python test_frontend.py` controlla il rendering delle pagine.
-`SPRITZ_PACKAGE_REPO_BIN=... python test_repo_proxy.py` prova il repo-proxy end
-to end (richiede il tool `package_repo`, vedi `docs/SETUP-WSL.md`).
+Tests (in-process, no network unless noted):
 
-## Variabili d'ambiente
+```bash
+python test_flow.py       # end-to-end catalog + library flow
+python test_security.py   # auth, rate-limit, validation, prod gate
+python test_frontend.py   # page rendering
+SPRITZ_PACKAGE_REPO_BIN=... python test_repo_proxy.py  # repo-proxy (needs package_repo)
+```
 
-| Variabile | Default | A cosa serve |
+## Configuration
+
+Set via environment variables. In `prod` the app **refuses to start** if
+`SPRITZ_SECRET` or `SPRITZ_ADMIN_TOKEN` are missing or still the dev default;
+in `dev` it starts with a warning.
+
+| Variable | Default | Purpose |
 |---|---|---|
-| `SPRITZ_ENV` | `dev` | `dev` (fallback comodi, solo avvisi) o `prod` (gate attivo). |
-| `SPRITZ_SECRET` | dev fallback | Chiave di firma dei JWT. In `prod` è obbligatoria. |
-| `SPRITZ_ADMIN_TOKEN` | non impostata | Token admin per `/ingest` e `/repo/build` (header `X-Admin-Token`). Se manca, quegli endpoint sono chiusi (503), mai aperti. In `prod` è obbligatoria. |
-| `SPRITZ_PACKAGE_REPO_BIN` | non impostata | Path al tool `package_repo` di Haiku (vedi `docs/SETUP-WSL.md`). Senza, il layer repo-proxy risponde 503; il resto del server gira lo stesso. |
-| `SPRITZ_REPO_CACHE` | `packages-cache` | Dir dove il repo-proxy scarica gli hpkg e genera i cataloghi. Fuori dal sorgente, gitignored. |
-| `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | URL pubblico annunciato in `repo.info`. Deve essere raggiungibile da HaikuDepot. |
-| `SPRITZ_CORS_ORIGINS` | localhost | Origini CORS ammesse (CSV) per il frontend web. Mai `*`. |
-| `SPRITZ_GITHUB_TOKEN` | non impostata | Token GitHub opzionale (uno personale a scope minimo basta). Alza il rate limit dell'API release da 60 a 5000 richieste/ora, usato sia dal crawler ombra sia dal confronto versioni nella pagina app (la copia ombra di un'app duplicata risolve la sua ultima release live). Senza token, sotto carico GitHub può rispondere 403 rate-limit e quella versione ombra viene semplicemente omessa dal confronto. Consigliato in `prod`. |
-| `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Dir dove finiscono icone/screenshot caricati. Gitignored. |
-| `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | URL del database. In prod puntalo a Postgres (vedi `migrations/`). |
-| `SPRITZ_HVIF2PNG_BIN` | non impostata | Path al tool `hvif2png` di Haiku per estrarre le icone dagli hpkg (vedi `docs/SETUP-WSL.md`). Senza, `/icon` risponde 404 e il frontend usa il placeholder. |
-| `SPRITZ_MAX_HPKG_ICON_BYTES` | `104857600` (100MB) | Oltre questa dimensione spritz non scarica l'hpkg solo per estrarne l'icona. |
-| `SPRITZ_HDS_URL` | `https://depot.haiku-os.org` | Base URL di HaikuDepotServer, da cui spritz importa (proxy + cache) gli screenshot per le app che non ne hanno di propri nel cichéto. Puntalo a un mirror se serve. |
-| `SPRITZ_FEATURED_CICHETO` | `repo.haikuports.genio` | Id (o lista di id separati da virgola) dei cichéti in evidenza nella home. Con più id la sezione diventa un carosello (scorrevole sui browser moderni, a coppie con le frecce su WebPositive). Gli id assenti dal catalogo vengono saltati; se non ne resta nessuno la sezione è omessa. |
-| `SPRITZ_BROWSE_HIDDEN_BACARI` | `haikuports` | Bàcari nascosti dalla vetrina/home (CSV). Restano cercabili e raggiungibili per link; la ricerca e i filtri espliciti li mostrano. Serve a non far dominare il mirror HaikuPorts la vetrina. |
-| `SPRITZ_BROWSE_HIDDEN_SUFFIXES` | `_devel,_debuginfo,_debug,_source,_sources,_doc,_docs,_dev` | Suffissi di sotto-pacchetto (build artifact) nascosti dalla vetrina (CSV, match su id e nome). Restano cercabili. |
+| `SPRITZ_ENV` | `dev` | `dev` (convenient fallbacks, warnings only) or `prod` (gate active, HTTP→HTTPS + HSTS). |
+| `SPRITZ_SECRET` | dev fallback | JWT signing key. Required in `prod`. |
+| `SPRITZ_ADMIN_TOKEN` | unset | Admin token for `/ingest`, `/repo/build` (`X-Admin-Token`). Endpoints closed (503) if unset. Required in `prod`. |
+| `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | Database URL. Point to Postgres in prod (see `migrations/`). |
+| `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | Public URL announced in `repo.info`. Must be reachable by HaikuDepot. |
+| `SPRITZ_CORS_ORIGINS` | localhost | Allowed CORS origins (CSV). Never `*`. |
+| `SPRITZ_PACKAGE_REPO_BIN` | unset | Path to Haiku's `package_repo` (see `docs/SETUP-WSL.md`). Without it the repo-proxy returns 503; the rest of the server still runs. |
+| `SPRITZ_HVIF2PNG_BIN` | unset | Path to Haiku's `hvif2png` for icon extraction. Without it `/icon` returns 404 and the frontend uses a placeholder. |
+| `SPRITZ_GITHUB_TOKEN` | unset | Optional GitHub token; raises the release-API rate limit from 60 to 5000/h. Recommended in `prod`. |
+| `SPRITZ_REPO_CACHE` | `packages-cache` | Where the repo-proxy downloads hpkg and builds catalogs. Gitignored. |
+| `SPRITZ_UPLOAD_DIR` | `packages-cache/assets` | Where uploaded icons/screenshots land. Gitignored. |
+| `SPRITZ_MAX_HPKG_ICON_BYTES` | `104857600` | Above this size spritz won't download an hpkg just for its icon. |
+| `SPRITZ_HDS_URL` | `https://depot.haiku-os.org` | HaikuDepotServer base URL, source of proxied/cached screenshots. |
+| `SPRITZ_FEATURED_CICHETO` | `repo.haikuports.genio` | Featured cichéto id(s) on the home (CSV → carousel). Missing ids are skipped. |
+| `SPRITZ_BROWSE_HIDDEN_BACARI` | `haikuports` | Bàcari hidden from the showcase (CSV). Still searchable and linkable. |
+| `SPRITZ_BROWSE_HIDDEN_SUFFIXES` | `_devel,_debuginfo,_debug,_source,_sources,_doc,_docs,_dev` | Sub-package suffixes hidden from the showcase (CSV). Still searchable. |
 
-In `prod` l'app **non parte** se `SPRITZ_SECRET` o `SPRITZ_ADMIN_TOKEN` mancano o
-sono ancora il default di sviluppo. In `dev` parte ma logga un avviso. In `prod`
-l'HTTP viene rediretto a HTTPS (con HSTS); in `dev` `http://localhost` resta
-valido. Login/register/ingest sono rate-limited (429 oltre la soglia).
-
-## Struttura
+## Layout
 
 ```
 app/
-  schemas.py     formato cichéto (validazione, Pydantic)
-  models.py      tabelle DB (cache cichéti, utenti, libreria)
-  db.py          engine/sessione (SQLite ora, Postgres in prod)
-  config.py      env + gate sicurezza prod (secret, admin token, tool path)
-  auth.py        bcrypt + JWT
-  ingest.py      crawl bàcaro (git o cartella) → cache
-  ombra.py       resolver canale ombra (ultima release GitHub dell'autore)
-  hpkr.py        lettore catalogo HPKR (risolve hpkg da repo Haiku di terze parti)
-  hvif.py        estrae l'icona HVIF da un hpkg e la converte in PNG (via hvif2png)
-  hpkg_heap.py   decompressione heap condivisa (none/zlib/zstd) per hpkr e hvif
-  repo_proxy.py  layer compatibile HaikuDepot (fetch+verifica, HPKR, serve)
-  main.py        route FastAPI (API + frontend)
-  templates/     pagine Jinja (home, app, get-spritz)
-  static/        CSS + JS del frontend (degrading button)
-sample-bacaro/   cichéto d'esempio (Genio)
+  schemas.py     cichéto format (Pydantic validation)
+  models.py      DB tables (cichéto cache, users, library queue)
+  db.py          engine/session (SQLite dev, Postgres prod)
+  config.py      env + prod security gate
+  auth.py        bcrypt + JWT (direct bcrypt, not passlib)
+  ingest.py      crawl a bàcaro (git or dir) → cache
+  ombra.py       ombra resolver (author's latest GitHub release)
+  hpkr.py        HPKR catalog reader (third-party Haiku repos)
+  hvif.py        HVIF icon extraction → PNG (via hvif2png)
+  hpkg_heap.py   shared heap decompression (none/zlib/zstd)
+  repo_proxy.py  HaikuDepot-compatible layer (fetch+verify, HPKR, serve)
+  main.py        FastAPI routes (API + frontend)
+  templates/     Jinja pages
+  static/        frontend CSS + JS
+sample-bacaro/   sample cichéto (Genio)
 ```
 
-## Endpoint principali
+## Key endpoints
 
-| Metodo | Path | Per chi |
+Full interactive docs at `/docs`. Highlights:
+
+| Method | Path | For |
 |---|---|---|
-| GET  | `/search?q=&category=&bacaro=&limit=&offset=` | catalogo (filtri + paginazione, ritorna `{total, results}`) |
-| GET  | `/api/categories` | categorie con conteggi |
-| GET  | `/bacari` | bàcari noti (conteggi, ultimo ingest) |
-| GET  | `/health` | liveness/readiness (503 se il DB non risponde) |
-| GET  | `/stats` | conteggi del catalogo (cichéti, bàcari, per categoria/canale) |
-| GET  | `/cicheto/{id}` | pagina-app |
-| GET  | `/resolve/{id}?channel=&arch=` | demone Haiku |
+| GET  | `/search?q=&category=&bacaro=&limit=&offset=` | catalog (filters + pagination) |
+| GET  | `/cicheto/{id}` | app page |
+| GET  | `/resolve/{id}?channel=&arch=` | Haiku daemon (url + sha256 + requires) |
+| GET  | `/icon/{id}` | app icon extracted from the hpkg (PNG, cached) |
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |
-| POST | `/auth/change-password` · `/auth/logout-all` | account (revoca i token) |
-| GET  | `/publish` | form di pubblicazione (web) |
-| POST | `/publish` | genera cichéto YAML (auth) |
-| POST | `/upload/image` | carica icona/screenshot, ritorna URL (auth) |
-| GET  | `/assets/{file}` | serve un'immagine caricata |
-| GET  | `/icon/{id}` | icona dell'app estratta dall'hpkg (PNG, cache) |
-| GET  | `/login` | pagina di accesso/registrazione (web) |
-| GET  | `/library-page` | pagina "le mie app" (web) |
-| POST | `/library/{id}` | accoda install (auth) |
-| POST | `/library/{id}/remove` | togli dalla libreria (auth) |
-| GET  | `/library/pending` | demone fa polling (auth) |
-| POST | `/library/{id}/installed` | demone conferma (auth) |
-| GET  | `/library` | "le mie app" (auth) |
-| POST | `/ingest` | crawl bàcaro + auto-rebuild repo (admin, `X-Admin-Token`) |
-| POST | `/repo/build` | rebuild completo dei sub-repo HaikuDepot (admin) |
-| GET  | `/admin` | pagina admin (web) |
-| GET  | `/admin/bacari` | bàcari memorizzati con URL ed esito (admin) |
-| POST | `/repo/import-hpkr` | importa un repo Haiku di terze parti (admin) |
-| GET  | `/repo/{vendor}/{arch}/current/repo.info` | HaikuDepot |
-| GET  | `/repo/{vendor}/{arch}/current/repo` | HaikuDepot (catalogo HPKR) |
-| GET  | `/repo/{vendor}/{arch}/current/packages/{file}` | HaikuDepot (hpkg) |
+| POST | `/library/{id}` · `/library/{id}/installed` | queue install / daemon confirm |
+| GET  | `/library/pending` | daemon polls |
+| POST | `/ingest` | crawl a bàcaro + auto-rebuild repo (admin) |
+| POST | `/repo/build` · `/repo/import-hpkr` | rebuild sub-repos / import third-party repo (admin) |
+| GET  | `/repo/{vendor}/{arch}/current/{repo.info,repo,packages/{file}}` | HaikuDepot |
 
-## Prossimi passi (non in v1)
+## Next steps (not in v1)
 
-1. **Demone Haiku** che consuma `/library/pending` (chiude il cerchio Play Store).
-2. **Tier di fiducia, firma manifest, transparency log** (fuori dal cichéto,
-   asserzioni firmate dell'indice).
-3. **Parte commerciale** (`spritz offri`, app a pagamento via Merchant of Record).
-4. Magic-link opzionale, refresh token, store rate-limit su Redis in prod.
+1. **Haiku daemon** consuming `/library/pending` (closes the Play Store loop).
+2. **Trust tiers, manifest signing, transparency log** (signed index
+   assertions, deliberately outside the editable cichéto).
+3. **Commercial layer** (`spritz offri`, paid apps via a Merchant of Record).
 
-Da verificare su Haiku reale (non in WSL): rendering del frontend in WebPositive,
-il probe del client nativo e lo schema `spritz://`, e l'aggiunta del repo-proxy
-in HaikuDepot.
+To verify on real Haiku (not WSL): frontend rendering in WebPositive, the native
+client probe and `spritz://` scheme, and adding the repo-proxy in HaikuDepot.
 
-## Note di sicurezza
+## Security notes
 
-- **`/ingest` è admin-only** (`X-Admin-Token`); chiuso se il token non è
-  configurato. La chiave JWT e il token admin vengono dall'ambiente, e in
-  `prod` l'app rifiuta di partire senza (vedi Variabili d'ambiente).
-- **Auth**: password min 12 caratteri, JWT a vita breve (2h) con revoca via
-  `token_version` (`logout`, `logout-all`, cambio password, cancellazione
-  account). Il logout dal browser fa una revoca lato server (non solo la pulizia
-  del token locale). Login con 401 generico (non rivela se l'email esiste, e la
-  via "email sconosciuta" paga comunque un bcrypt per non essere distinguibile a
-  tempo). Rate-limit su login/register/ingest.
-- **Ingest**: URL git validato (https; locale solo in dev), clone con timeout e
-  cap su dimensione e numero file.
-- **Repo-proxy**: SSRF guard sugli URL autore (in prod solo https, no indirizzi
-  interni/loopback), download con cap di dimensione, sha256 sempre verificato.
-- `sha256` obbligatorio sui canali pinned; verificato dal demone al download.
-- I canali `github-latest` non pre-calcolano l'hash: il demone verifica al volo
-  e logga l'hash visto (trade-off accettabile per i soli nightly).
-- Trust tier e prezzo **non** stanno nel cichéto (file editabile nel repo git):
-  vanno nell'indice firmato, così un fork non si auto-promuove.
+- **`/ingest` and repo-admin routes are admin-only** (`X-Admin-Token`), closed
+  when the token is unset. In `prod` the app refuses to start without a real
+  secret and admin token.
+- **Auth**: min 12-char passwords, short-lived JWTs (2h) with server-side
+  revocation via `token_version` (logout, logout-all, password change, account
+  deletion). Generic 401 on login (does not reveal whether an email exists, and
+  pays a bcrypt on the unknown-email path to stay timing-indistinguishable).
+- **Ingest**: git URL validated (https; local only in dev), clone with timeout
+  and caps on size and file count.
+- **Repo-proxy**: SSRF guard on author URLs (prod: https only, no internal
+  hosts), download size caps, sha256 always verified.
+- `sha256` is mandatory on pinned channels. `github-latest` channels do not
+  pre-compute the hash; the daemon verifies it at download and logs what it saw.
+- Trust tier and price are **not** in the cichéto (an editable git file): they
+  belong to the signed index, so a fork cannot self-promote.
 
-## Privacy e titolare del trattamento
+## Privacy
 
-Il titolare del trattamento dei dati è **Andrea Bernardi**
-(andrea@studiobernardi.eu).
+Data controller: **Andrea Bernardi** (andrea@studiobernardi.eu).
 
-spritz raccoglie il minimo: email e password (hash bcrypt) per l'accesso, più la
-lista delle app che aggiungi alla libreria. Nessun cookie di tracciamento,
-nessuna profilazione; le statistiche di download sono anonime (nessun id utente,
-nessun IP) e l'IP è usato solo in memoria dal rate-limiter, mai memorizzato. La
-base giuridica è l'esecuzione del servizio (art. 6.1.b GDPR) e i dati restano
-finché l'account è attivo.
+spritz collects the minimum: email and password (bcrypt hash) for login, plus
+your library list. No tracking cookies, no profiling; download stats are
+anonymous (no user id, no IP) and the IP is used in memory by the rate-limiter
+only, never stored. Legal basis is service performance (GDPR art. 6.1.b); data
+is kept while the account is active. Users exercise their rights in-app:
+`/privacy` shows the notice, `/account` exports data as JSON (arts. 15, 20) or
+deletes the account and library (art. 17).
 
-L'utente può esercitare i propri diritti dall'interfaccia:
+## Third-party components
 
-- `/privacy` mostra l'informativa (tradotta in tutte le lingue supportate).
-- `/account` ("I miei dati"): esporta i propri dati in JSON (accesso e
-  portabilità, artt. 15 e 20) via `GET /auth/me`, o elimina definitivamente
-  account e libreria (diritto all'oblio, art. 17) via `POST /auth/delete-account`
-  (richiede la password).
+- **haikon_full.js** (`app/static/`): client-side HVIF → SVG parser/renderer by
+  3dEyes (Gerasim Troeglazov), from https://hvif-store.art (see also
+  https://github.com/threedeyes/hvif-tools). MIT licensed. spritz uses it to
+  draw app icons as SVG in the browser (via `/hvif/{id}`), without depending on
+  the native `hvif2png`. Server-side PNG rendering stays as an alternative.
 
-## Componenti di terze parti
+## License
 
-- **haikon_full.js** (`app/static/`): parser e renderer HVIF -> SVG lato client, di
-  3dEyes** (Gerasim Troeglazov), da https://hvif-store.art (vedi anche
-  https://github.com/threedeyes/hvif-tools). Licenza MIT. spritz lo usa per
-  disegnare le icone delle app come SVG nel browser (endpoint `/hvif/{id}` che
-  serve il blob HVIF grezzo), senza dipendere dal tool nativo `hvif2png`. Il
-  rendering PNG lato server (`hvif2png` + `/icon/{id}`) resta come alternativa.
-
-## Licenza
-
-spritz è rilasciato sotto licenza **MIT** (vedi il file [LICENSE](LICENSE)).
-Copyright (c) 2026 Andrea Bernardi. Include codice di terze parti sotto la
-propria licenza MIT (vedi la sezione "Componenti di terze parti" sopra).
+spritz is released under the **MIT** license (see [LICENSE](LICENSE)).
+Copyright (c) 2026 Andrea Bernardi. Includes third-party code under its own MIT
+license (see "Third-party components" above).
