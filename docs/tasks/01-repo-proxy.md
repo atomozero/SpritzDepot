@@ -66,8 +66,13 @@ verified hpkg). What works now:
 - `POST /repo/build` (admin): groups stable hpkg by the vendor read from each
   hpkg's own `.PackageInfo` (not the cichéto, which has no vendor), per arch;
   fetches each with sha256 verification; runs `package_repo create` per group.
-- `GET /repo/{vendor}/{arch}/current/{repo.info,repo,packages/<file>}` serve the
-  generated catalog and the staged hpkg (canonical name-version-arch.hpkg).
+- `GET /repo/{vendor}/{arch}/current/{repo.info,repo,repo.sha256,packages/<file>}`
+  serve the generated catalog and the staged hpkg (canonical name-version-arch.hpkg).
+- `repo.sha256` is the checksum of the `repo` catalog, on its own line, the format
+  Haiku's own repo scripts emit (bbjimmy's build.sh in `D:\Sorgenti\reposetup`).
+  Added defensively: HaikuDepot fetches it to verify the catalog. NOT yet confirmed
+  against a real HaikuDepot that it is required (verify on the first live test); it
+  is cheap and harmless if unused.
 - Degrades to 503 when `package_repo` is not configured; rest of the server runs.
 
 **Refinement vs the original "pure proxy" plan:** packages are fetched and kept

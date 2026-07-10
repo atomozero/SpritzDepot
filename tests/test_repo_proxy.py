@@ -137,6 +137,13 @@ cat = c.get(f"{base}/repo")
 print("repo (HPKR) ->", cat.status_code, len(cat.content), "bytes")
 assert cat.status_code == 200 and cat.content[:4] == b"hpkr", "catalog should be HPKR"
 
+# repo.sha256 is served alongside the catalog and matches it (HaikuDepot fetches
+# it to verify the download; bbjimmy's build.sh produces the same file).
+chk = c.get(f"{base}/repo.sha256")
+print("repo.sha256 ->", chk.status_code)
+assert chk.status_code == 200, chk.text
+assert chk.text.strip() == hashlib.sha256(cat.content).hexdigest(), "repo.sha256 must match repo"
+
 pkg = c.get(f"{base}/packages/{hpkg.name}")
 print("package ->", pkg.status_code, len(pkg.content), "bytes")
 assert pkg.status_code == 200, pkg.text

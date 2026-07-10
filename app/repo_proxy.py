@@ -296,4 +296,10 @@ def build_subrepo(hpkgs: list[Path], vendor: str, architecture: str,
     catalog = out_dir / "repo"
     if not catalog.is_file():
         raise RepoProxyError("package_repo create produced no catalog")
+
+    # Write repo.sha256 next to the catalog: the checksum of the `repo` file, on
+    # its own line with no filename (the format Haiku's own repo scripts emit,
+    # e.g. bbjimmy's build.sh). HaikuDepot fetches it alongside repo/repo.info to
+    # verify the catalog it downloaded. Cheap to produce and harmless if unused.
+    (out_dir / "repo.sha256").write_text(_sha256_file(catalog) + "\n")
     return out_dir

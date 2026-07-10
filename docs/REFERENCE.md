@@ -44,7 +44,7 @@ Full interactive docs at `/docs`. Highlights:
 | GET  | `/admin/stats` · `/admin/stats-page` | registry stats: users, downloads, taps, ombra (admin) |
 | POST | `/ingest` | crawl a bàcaro + auto-rebuild repo (admin) |
 | POST | `/repo/build` · `/repo/import-hpkr` | rebuild sub-repos / import third-party repo (admin) |
-| GET  | `/repo/{vendor}/{arch}/current/{repo.info,repo,packages/{file}}` | HaikuDepot |
+| GET  | `/repo/{vendor}/{arch}/current/{repo.info,repo,repo.sha256,packages/{file}}` | HaikuDepot |
 
 ## Environment
 

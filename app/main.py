@@ -1451,6 +1451,16 @@ def repo_catalog(vendor: str, arch: str):
     return FileResponse(path, media_type="application/octet-stream")
 
 
+@app.get("/repo/{vendor}/{arch}/current/repo.sha256", response_class=PlainTextResponse)
+def repo_checksum(vendor: str, arch: str):
+    """The sha256 of the `repo` catalog, which HaikuDepot fetches alongside it to
+    verify the download. Built by build_subrepo next to the catalog."""
+    path = _subrepo_dir(vendor, arch) / "current" / "repo.sha256"
+    if not path.is_file():
+        raise HTTPException(404, "repo not built for this vendor/arch")
+    return PlainTextResponse(path.read_text())
+
+
 @app.get("/repo/{vendor}/{arch}/current/packages/{filename}")
 def repo_package(vendor: str, arch: str, filename: str):
     # Defend against path traversal: only a bare filename is allowed.
