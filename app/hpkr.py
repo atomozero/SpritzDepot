@@ -355,6 +355,14 @@ def _parse_catalog_inner(blob: bytes) -> list:
     # single 0-byte terminator (an empty string can't be distinguished from the
     # end marker, per WriteCachedStrings). Consume that terminator before the
     # attributes begin.
+    # strings_count is an unbounded u64 from the attacker-controlled header. Each
+    # string is at least one byte (its null terminator), so more than
+    # len(pkg_section) strings is impossible; cap it there before building the
+    # list so a lie like 2**63 cannot drive a giant allocation / CPU burn.
+    # cstring() still raises at EOF, this just refuses the count up front.
+    if strings_count > len(pkg_section):
+        raise HpkrError(
+            f"strings_count {strings_count} exceeds section size {len(pkg_section)}")
     strings: list = [r.cstring() for _ in range(strings_count)]
     if not r.eof() and r.data[r.pos] == 0:
         r.pos += 1

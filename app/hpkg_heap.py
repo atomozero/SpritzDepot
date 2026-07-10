@@ -41,12 +41,33 @@ def _inflate_chunk(compression: int, comp: bytes, uncompressed_size: int) -> byt
 
     A chunk may be stored uncompressed even in a compressed heap when
     compression did not help; in that case its bytes are passed through. We
-    detect that by length (compressed == uncompressed)."""
+    detect that by length (compressed == uncompressed). The output is verified
+    to be exactly `uncompressed_size`: this is the single choke point where a
+    codec that over- or under-produces is caught, so the single-chunk return in
+    decompress_heap (which skips the whole-heap size check) is still safe."""
+    out = _inflate_chunk_raw(compression, comp, uncompressed_size)
+    if len(out) != uncompressed_size:
+        raise HeapError(
+            f"chunk size mismatch: got {len(out)}, expected {uncompressed_size}")
+    return out
+
+
+def _inflate_chunk_raw(compression: int, comp: bytes, uncompressed_size: int) -> bytes:
     if compression == 0 or len(comp) == uncompressed_size:
         return comp
     if compression == 1:
+        # Bound the output like the zstd branch does. A plain zlib.decompress()
+        # ignores uncompressed_size and inflates to whatever the bytes expand to,
+        # so a ~200 KB chunk can balloon to hundreds of MB (a decompression bomb
+        # that bypasses the MAX_HEAP_UNCOMPRESSED cap). Decompress with an exact
+        # max_length and reject any input that had more to give.
         try:
-            return zlib.decompress(comp)
+            dec = zlib.decompressobj()
+            out = dec.decompress(comp, uncompressed_size)
+            if dec.unconsumed_tail or dec.unused_data:
+                raise HeapError(
+                    "zlib chunk expands past its declared size (possible bomb)")
+            return out
         except zlib.error as e:
             raise HeapError(f"zlib chunk decompress failed: {e}") from e
     if compression == 2:
