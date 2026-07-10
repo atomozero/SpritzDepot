@@ -197,6 +197,14 @@ assert c.post("/library/org.haiku.genio/remove").status_code == 401  # needs aut
 assert 'data-s-remove' in c.get("/library-page").text
 print("my-apps library    -> ok (add + remove)")
 
+# About page: renders, carries the story + the additive framing, is linked from
+# the footer on every page, and translates.
+ab = c.get("/about")
+assert ab.status_code == 200 and "BeBits" in ab.text and "AUR" in ab.text, "about page content"
+assert "/about" in c.get("/").text, "footer must link to /about"
+assert "About spritz" in c.get("/about", cookies={"lang": "en"}).text, "about must translate"
+print("about page         -> ok")
+
 # Italian copy + no em dashes in templates (project rule)
 for tmpl in Path("app/templates").glob("*.html"):
     assert "—" not in tmpl.read_text(), f"em dash found in {tmpl.name}"

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ t('about.title') }} - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail" style="max-width:720px;">
+  <h1>{{ t('about.title') }}</h1>
+  <p class="lead">{{ t('about.lead') }}</p>
+
+  <section class="install">
+    <h2>{{ t('about.why_title') }}</h2>
+    <p>{{ t('about.why_bebits') }}</p>
+    <p>{{ t('about.why_gap') }}</p>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('about.how_title') }}</h2>
+    <ul>
+      <li>{{ t('about.concept_cicheto') }}</li>
+      <li>{{ t('about.concept_bacaro') }}</li>
+      <li>{{ t('about.concept_channels') }}</li>
+      <li>{{ t('about.concept_bridge') }}</li>
+    </ul>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('about.additive_title') }}</h2>
+    <div class="bridge-note">
+      <strong>{{ t('about.additive_lead') }}</strong> {{ t('about.additive_body') }}
+    </div>
+  </section>
+
+  <section class="install">
+    <h2>{{ t('about.open_title') }}</h2>
+    <p>{{ t('about.open_body') }}</p>
+    <p>
+      <a class="btn" href="/publish">{{ t('nav.publish') }}</a>
+      <a class="btn btn-fallback" href="/">{{ t('app.back_to_catalog') }}</a>
+    </p>
+  </section>
+</article>
+{% endblock %}

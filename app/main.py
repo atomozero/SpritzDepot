@@ -1556,6 +1556,14 @@ def privacy_page(request: Request):
     return render(request, "privacy.html", {})
 
 
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request):
+    """What spritz is and why it exists: the BeBits gap HaikuDepot leaves, the
+    core concepts (cichéto, bàcaro, channels, bridge), and the additive-to-
+    HaikuPorts framing. Static, translated."""
+    return render(request, "about.html", {})
+
+
 @app.get("/account", response_class=HTMLResponse)
 def account_page(request: Request):
     """'My data' page: the JS uses the stored token to fetch /auth/me (access +
