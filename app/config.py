@@ -43,6 +43,16 @@ if _bootstrap_env is not None:
 else:
     BOOTSTRAP_ADMIN = ENV != "prod"
 
+# Whether the app sits behind a trusted reverse proxy that sets X-Forwarded-For
+# and X-Forwarded-Proto. When on, the rate limiter keys on the client IP from
+# X-Forwarded-For (else every request looks like it comes from the proxy and all
+# clients share one bucket, so one abuser throttles everyone). Leave OFF unless
+# the app is ONLY reachable through that proxy: a directly-reachable app with
+# this on lets a client spoof its rate-limit key (and its forwarded scheme) with
+# a header. Defaults OFF.
+_trust_proxy_env = os.environ.get("SPRITZ_TRUST_PROXY")
+TRUST_PROXY = (_trust_proxy_env or "").strip().lower() in ("1", "true", "yes", "on")
+
 # Path to Haiku's host-built `package_repo` tool (see docs/SETUP-WSL.md step 2).
 # If unset or not found, the repo-proxy layer reports 503 instead of crashing,
 # so the rest of the server runs fine without it.

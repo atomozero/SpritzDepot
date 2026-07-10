@@ -41,12 +41,28 @@ class BlockedURLError(RuntimeError):
     """The URL is refused before any network request is made."""
 
 
-def guard_url(url: str) -> None:
-    """Raise BlockedURLError if `url` must not be fetched.
+def _ip_forbidden(ip: ipaddress._BaseAddress) -> bool:
+    """Whether an address is off-limits. Loopback is allowed in dev only (the
+    test suite hits 127.0.0.1); everything private/internal is always refused."""
+    if ip.is_loopback and not config.IS_PROD:
+        return False
+    return bool(ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
+
+
+def guard_url(url: str) -> str:
+    """Validate `url` and return a safe IP literal to connect to.
 
     Always rejects hosts that resolve to a private/loopback/link-local/multicast/
     reserved/unspecified address. In prod additionally requires https and rejects
-    loopback; in dev http and loopback are allowed (for tests / local repos)."""
+    loopback; in dev http and loopback are allowed (for tests / local repos).
+
+    Returns one resolved, validated IP. Callers connect to THAT IP (with the host
+    preserved as Host header + TLS SNI) so the address that was checked is the
+    address that is dialed. Without this, guard_url resolves the name but httpx
+    resolves it again on connect, and an attacker controlling DNS could answer
+    the two lookups differently (DNS rebinding) to reach an internal service.
+    Raises BlockedURLError if the URL or every resolved address is refused."""
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()
     host = parsed.hostname
@@ -59,20 +75,56 @@ def guard_url(url: str) -> None:
     if scheme not in ("http", "https"):
         raise BlockedURLError(f"refusing non-http(s) URL: {url}")
 
+    # A bare IP literal in the URL is validated directly (no name to resolve).
+    try:
+        literal = ipaddress.ip_address(host)
+    except ValueError:
+        literal = None
+    if literal is not None:
+        if _ip_forbidden(literal):
+            raise BlockedURLError(f"refusing to fetch internal address {literal}")
+        return str(literal)
+
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror as e:
         raise BlockedURLError(f"cannot resolve host {host}: {e}") from e
+
+    safe_ip = None
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        # loopback is allowed in dev only (the test suite hits 127.0.0.1).
-        loopback_ok = ip.is_loopback and not config.IS_PROD
-        if loopback_ok:
-            continue
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+        if _ip_forbidden(ip):
+            # If ANY resolved address is internal, refuse the whole host: a
+            # mixed answer (one public, one internal) is exactly the rebinding
+            # trick, so we do not just pick a good one.
             raise BlockedURLError(
                 f"refusing to fetch internal address {ip} ({host})")
+        if safe_ip is None:
+            safe_ip = str(ip)
+
+    if safe_ip is None:
+        raise BlockedURLError(f"cannot resolve host {host}")
+    return safe_ip
+
+
+def _pinned_request(client: httpx.Client, method: str, url: str,
+                    safe_ip: str, **kwargs) -> httpx.Request:
+    """Build a request that connects to `safe_ip` (the address guard_url just
+    validated) while keeping the original host for routing, the Host header, and
+    TLS SNI. This closes the DNS-rebinding gap: httpx dials the exact IP we
+    checked instead of resolving the name a second time."""
+    original = httpx.URL(url)
+    host = original.host
+    # Point the connection at the validated IP; preserve the host everywhere it
+    # matters so virtual-hosting and certificate validation still work.
+    dial_url = original.copy_with(host=safe_ip)
+    headers = kwargs.pop("headers", None) or {}
+    headers = dict(headers)
+    headers.setdefault("Host", original.netloc.decode("ascii"))
+    extensions = dict(kwargs.pop("extensions", None) or {})
+    extensions.setdefault("sni_hostname", host)
+    return client.build_request(method, dial_url, headers=headers,
+                                extensions=extensions, **kwargs)
 
 
 def _guarded_redirects(client: httpx.Client, method: str, url: str,
@@ -83,8 +135,8 @@ def _guarded_redirects(client: httpx.Client, method: str, url: str,
     hops = 0
     current = url
     while True:
-        guard_url(current)
-        req = client.build_request(method, current, **kwargs)
+        safe_ip = guard_url(current)
+        req = _pinned_request(client, method, current, safe_ip, **kwargs)
         resp = client.send(req, stream=stream)
         if resp.is_redirect and hops < MAX_REDIRECTS:
             location = resp.headers.get("location")

@@ -13,12 +13,15 @@ daemon this is a wishlist; with it, it's remote install.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+log = logging.getLogger("spritz")
 
 import httpx
 
@@ -62,7 +65,28 @@ from .schemas import Cicheto, cicheto_to_yaml
 # costlier override it with their own @limiter.limit. Overridable via env for
 # load tuning.
 _DEFAULT_RATE = os.environ.get("SPRITZ_DEFAULT_RATE_LIMIT", "120/minute")
-limiter = Limiter(key_func=get_remote_address, default_limits=[_DEFAULT_RATE])
+
+
+def _client_key(request: Request) -> str:
+    """Rate-limit key: the real client IP.
+
+    Behind a trusted proxy (config.TRUST_PROXY) the peer is the proxy, so every
+    request would share one bucket and one abuser could throttle everyone. There
+    we take the first hop of X-Forwarded-For (the original client). We only trust
+    that header when explicitly told to, because otherwise any client could spoof
+    its own rate-limit key with a header. Without the flag, we key on the direct
+    peer, which is not spoofable.
+    """
+    if config.TRUST_PROXY:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return first
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_client_key, default_limits=[_DEFAULT_RATE])
 
 
 @asynccontextmanager
@@ -74,7 +98,14 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="spritz registry", version="0.1.0", lifespan=lifespan)
+# Interactive docs and the OpenAPI schema are handy in dev but hand an attacker
+# a full route map in prod, so they are disabled there (every endpoint they list
+# is authenticated, but there is no reason to publish the map). Override nothing:
+# in dev /docs, /redoc, /openapi.json stay on.
+_docs_kwargs = ({} if not config.IS_PROD
+                else {"docs_url": None, "redoc_url": None, "openapi_url": None})
+app = FastAPI(title="spritz registry", version="0.1.0", lifespan=lifespan,
+              **_docs_kwargs)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -87,7 +118,13 @@ class HTTPSRedirectAndHSTS(BaseHTTPMiddleware):
     """
     async def dispatch(self, request: Request, call_next):
         if config.IS_PROD:
-            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            # Trust X-Forwarded-Proto only behind a trusted proxy; otherwise a
+            # direct client could send "https" to skip the redirect. Without the
+            # flag, fall back to the real connection scheme.
+            if config.TRUST_PROXY:
+                proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            else:
+                proto = request.url.scheme
             if proto != "https":
                 https_url = request.url.replace(scheme="https")
                 return RedirectResponse(str(https_url), status_code=307)
@@ -865,7 +902,11 @@ def resolve(request: Request, cicheto_id: str,
         try:
             artifacts = hpkr.resolve_from_repo(repo_url, package, arch)
         except hpkr.HpkrError as e:
-            raise HTTPException(502, f"hpkr-repo resolve failed: {e}")
+            # Public endpoint: log the detail (which repo URL, which error) but
+            # return a generic message so the third-party repo URL and internals
+            # are not echoed to arbitrary callers.
+            log.warning("hpkr-repo resolve failed for %s: %s", cicheto_id, e)
+            raise HTTPException(502, "could not resolve from the source repository")
     elif source == "haikuports":
         # Bridge-only: spritz hosts no artifact; the app is curated in
         # HaikuPorts. Tell the client to install it from there.
@@ -2019,8 +2060,11 @@ def health(session: Session = Depends(get_session)):
     so a load balancer can take the instance out of rotation."""
     try:
         session.exec(select(CichetoRow.id).limit(1)).first()
-    except Exception as e:
-        raise HTTPException(503, f"database unavailable: {e}")
+    except Exception:
+        # Log the detail server-side; don't return it. This endpoint is public
+        # and unauthenticated, and the exception can carry a DB path or DSN.
+        log.exception("health check: database unavailable")
+        raise HTTPException(503, "database unavailable")
     return {"status": "ok", "version": "0.1.0"}
 
 

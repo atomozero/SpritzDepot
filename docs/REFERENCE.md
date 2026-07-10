@@ -60,6 +60,7 @@ default; in `dev` it starts with a warning.
 | `SPRITZ_DB_URL` | `sqlite:///./spritz.db` | Database URL. Point to Postgres in prod (see `migrations/`). |
 | `SPRITZ_PUBLIC_BASE_URL` | `http://localhost:8000` | Public URL announced in `repo.info`. Must be reachable by HaikuDepot. |
 | `SPRITZ_CORS_ORIGINS` | localhost | Allowed CORS origins (CSV). Never `*`. |
+| `SPRITZ_TRUST_PROXY` | off | On only behind a trusted reverse proxy: keys the rate limiter on the real client IP (`X-Forwarded-For`) and honors `X-Forwarded-Proto`. Leave off if the app is directly reachable (a header could otherwise spoof the key/scheme). |
 | `SPRITZ_DEFAULT_RATE_LIMIT` | `120/minute` | Global default rate limit applied to routes. |
 | `SPRITZ_BOOTSTRAP_ADMIN` | dev on, prod off | Auto-promote the first registered user to admin. Force with `1`/`0`. |
 | `SPRITZ_PACKAGE_REPO_BIN` | unset | Path to Haiku's `package_repo` (see `docs/SETUP-WSL.md`). Without it the repo-proxy returns 503; the rest of the server still runs. |

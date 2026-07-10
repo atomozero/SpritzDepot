@@ -200,6 +200,55 @@ assert "guard_url(current)" in _src, "redirect hops must be re-guarded"
 assert netguard.fetch_guarded.__doc__ and "redirect" in netguard.fetch_guarded.__doc__.lower()
 print("redirect guard       -> ok (every hop re-validated, no blind follow)")
 
+# --- SSRF: guard_url returns a validated IP to pin the connection to, so the
+#     address that was checked is the address that gets dialed (no DNS-rebinding
+#     window between guard_url's resolution and httpx's). ---
+_cfg.IS_PROD = False
+try:
+    ip = netguard.guard_url("http://127.0.0.1:8000/repo")
+    assert ip in ("127.0.0.1", "::1"), f"expected loopback IP, got {ip!r}"
+    ip2 = netguard.guard_url("https://93.184.216.34/x")  # a bare public IP literal
+    assert ip2 == "93.184.216.34", ip2
+finally:
+    _cfg.IS_PROD = _saved_prod
+# The connection is pinned to that IP with the original host kept as Host + SNI:
+_pin = _inspect.getsource(netguard._pinned_request)
+assert "sni_hostname" in _pin and "Host" in _pin, "pin must preserve SNI + Host"
+assert "safe_ip = guard_url(current)" in _src, "hops must connect to the guarded IP"
+print("SSRF pin             -> ok (guard returns IP, connection pinned to it)")
+
+# --- rate-limit key: proxy-awareness is off by default (peer IP, not spoofable),
+#     and only reads X-Forwarded-For when the operator opts in. ---
+from app import main as _main
+from starlette.requests import Request as _Request
+
+
+def _fake_request(headers, client_ip="203.0.113.9"):
+    scope = {
+        "type": "http", "method": "GET", "path": "/", "query_string": b"",
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+        "client": (client_ip, 12345),
+    }
+    return _Request(scope)
+
+_hdrs = {"x-forwarded-for": "198.51.100.7, 10.0.0.1"}
+
+# Off by default: the forwarded header is ignored, we key on the peer.
+_saved_tp = _cfg.TRUST_PROXY
+_cfg.TRUST_PROXY = False
+try:
+    assert _main._client_key(_fake_request(_hdrs)) == "203.0.113.9", "must ignore XFF when untrusted"
+finally:
+    _cfg.TRUST_PROXY = _saved_tp
+# On: the first XFF hop (the original client) becomes the key.
+_cfg.TRUST_PROXY = True
+try:
+    assert _main._client_key(_fake_request(_hdrs)) == "198.51.100.7", "must use first XFF hop when trusted"
+    assert _main._client_key(_fake_request({})) == "203.0.113.9", "no XFF -> fall back to peer"
+finally:
+    _cfg.TRUST_PROXY = _saved_tp
+print("rate-limit key       -> ok (peer by default, XFF only when trusted)")
+
 # Prod gate: missing secrets must raise.
 from app import config
 saved = (config.IS_PROD, config.SECRET_KEY, config.ADMIN_TOKEN)
