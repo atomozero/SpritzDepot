@@ -127,6 +127,7 @@ pub = c.get("/publish")
 assert pub.status_code == 200 and 'id="publish-form"' in pub.text
 assert c.get("/static/publish.js").status_code == 200
 form = {"id": "org.test.pub", "name": "Pub", "summary": "test",
+        "description": "First paragraph.\n\nSecond paragraph.",
         "bacaro": "tap", "arch": "x86_64",
         "hpkg_url": "https://e.org/pub-1.0-x86_64.hpkg", "sha256": "a" * 64,
         "version": "1.0", "haikuports": "pub"}
@@ -138,6 +139,9 @@ gen = c.post("/publish", json=form_icon, headers={"Authorization": f"Bearer {_to
 assert gen.status_code == 200, gen.text
 assert "org.test.pub.yaml" in gen.headers.get("content-disposition", "")
 assert "icon: https://example.org/icon.png" in gen.text, "icon URL should be in the YAML"
+assert "description:" in gen.text and "Second paragraph." in gen.text, "description must be in the YAML"
+# The publish form offers a description field.
+assert 'name="description"' in pub.text, "publish form must have a description field"
 # a bad icon URL is rejected by the schema
 assert c.post("/publish", json=dict(form, icon="not-a-url"),
               headers={"Authorization": f"Bearer {_tok}"}).status_code == 422
@@ -148,7 +152,9 @@ _d = Path(tempfile.mkdtemp())
 (_d / "org.test.pub.yaml").write_text(gen.text)
 rep = ingest_directory(_d, "tap")
 assert rep["ingested"] == ["org.test.pub"] and not rep["failed"], rep
-print("publish round-trip -> ok")
+# The ingested description reaches the app page.
+assert "Second paragraph." in c.get("/app/org.test.pub").text, "description not shown on app page"
+print("publish round-trip -> ok (description carried through)")
 
 # Image upload (convenience) + serving + validation
 import struct as _struct, zlib as _zlib

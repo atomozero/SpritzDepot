@@ -97,6 +97,9 @@ class Cicheto(BaseModel):
     id: str = Field(min_length=3, max_length=128)   # reverse-domain, e.g. org.haiku.genio
     name: str = Field(min_length=1, max_length=200)
     summary: str = Field(default="", max_length=2000)
+    # Long description (multiple paragraphs, blank-line separated). Shown on the
+    # app page; the summary is the one-liner. Plain text, rendered escaped.
+    description: str = Field(default="", max_length=20000)
     homepage: Optional[HttpUrl] = None
     license: Optional[str] = Field(default=None, max_length=200)
     categories: list[str] = Field(default_factory=list, max_length=64)
@@ -136,11 +139,13 @@ def cicheto_to_yaml(c: "Cicheto") -> str:
     keeps a stable, human-readable key order."""
     data = c.model_dump(mode="json", exclude_none=True)
 
-    # Strip empty collections and the prerelease=false default for a tidy file.
+    # Strip empty collections/strings and the prerelease=false default for a tidy
+    # file (only what was actually set shows up).
     def prune(obj):
         if isinstance(obj, dict):
             return {k: prune(v) for k, v in obj.items()
-                    if not (v == [] or v == {} or (k == "prerelease" and v is False))}
+                    if not (v == [] or v == {} or v == ""
+                            or (k == "prerelease" and v is False))}
         if isinstance(obj, list):
             return [prune(v) for v in obj]
         return obj
@@ -148,9 +153,9 @@ def cicheto_to_yaml(c: "Cicheto") -> str:
     data = prune(data)
 
     # Preferred top-level order; anything else trails in its existing order.
-    order = ["cicheto", "id", "name", "summary", "homepage", "license",
-             "categories", "icon", "screenshots", "author", "packager",
-             "bridge", "channels"]
+    order = ["cicheto", "id", "name", "summary", "description", "homepage",
+             "license", "categories", "icon", "screenshots", "author",
+             "packager", "bridge", "channels"]
     ordered = {k: data[k] for k in order if k in data}
     ordered.update({k: v for k, v in data.items() if k not in ordered})
 

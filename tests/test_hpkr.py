@@ -130,10 +130,14 @@ try:
     assert r.status_code == 200, r.text
     body_ = r.json()
     assert body_["found_in_catalog"] == 2 and len(body_["ingested"]) == 2, body_
-    # the imported cichéto carries the hpkg's real summary, not the placeholder
+    # the imported cichéto carries the hpkg's real summary + description, not the
+    # placeholder, and the app page renders the description.
     man = c.get("/cicheto/repo.tap.helloapp").json()
     assert man["summary"] == "test helloapp", man.get("summary")
-    print("import uses summary -> ok (real hpkg summary, not placeholder)")
+    assert man.get("description") == "hpkr parser test package", man.get("description")
+    page = c.get("/app/repo.tap.helloapp").text
+    assert "hpkr parser test package" in page, "description not shown on the app page"
+    print("import uses summary -> ok (real summary + description shown)")
     # the imported cichéto resolves live to the package URL
     res = c.get("/resolve/repo.tap.helloapp?channel=stable&arch=x86_64").json()
     assert res["source"] == "hpkr-repo"

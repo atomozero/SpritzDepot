@@ -344,6 +344,7 @@ class PublishBody(BaseModel):
     id: str
     name: str
     summary: str
+    description: Optional[str] = None        # long text, blank-line paragraphs
     bacaro: str
     homepage: Optional[str] = None
     license: Optional[str] = None
@@ -1318,6 +1319,9 @@ def import_hpkr(request: Request, body: ImportHpkrBody,
                 "source": "hpkr-repo", "repo_url": base, "package": p.name,
             }},
         }
+        # The hpkg's long description, if it carries one (capped to the schema).
+        if p.description:
+            data["description"] = p.description[:20000]
         try:
             Cicheto.model_validate(data)   # guard: only write valid cichéti
         except Exception:
@@ -1665,6 +1669,7 @@ def publish_generate(request: Request, body: "PublishBody",
         "id": body.id,
         "name": body.name,
         "summary": body.summary,
+        "description": (body.description or "").strip(),
         "homepage": body.homepage or None,
         "license": body.license or None,
         "icon": body.icon or None,

@@ -2,6 +2,13 @@ cicheto: 1
 id: org.haiku.genio
 name: Genio
 summary: IDE nativo per Haiku
+description: |
+  Genio e un ambiente di sviluppo integrato scritto nativamente per Haiku,
+  pensato per C/C++ ma estensibile ad altri linguaggi.
+
+  Offre completamento del codice tramite LSP, integrazione con git, un
+  debugger e la gestione di progetti multipli. Punta a un'esperienza fluida
+  e coerente con lo stile di Haiku.
 homepage: https://github.com/Genio-The-Haiku-IDE/Genio
 license: MIT
 categories:
