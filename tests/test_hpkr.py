@@ -33,6 +33,12 @@ hello = [p for p in pkgs if p.name == "helloapp"][0]
 assert hello.architecture == "x86_64" and hello.version == "1.2.3-4", hello
 print("fields decoded     -> ok (arch x86_64, version 1.2.3-4)")
 
+# summary + description are extracted from the hpkg attributes (ids 16/17, from
+# Haiku's PackageAttributes.h). This fixture carries both; they must not be lost.
+assert hello.summary == "test helloapp", hello.summary
+assert hello.description == "hpkr parser test package", hello.description
+print("summary/desc read  -> ok (test helloapp / hpkr parser test package)")
+
 # bad magic is rejected
 try:
     hpkr.parse_catalog(b"NOPE" + blob[4:])
@@ -124,6 +130,10 @@ try:
     assert r.status_code == 200, r.text
     body_ = r.json()
     assert body_["found_in_catalog"] == 2 and len(body_["ingested"]) == 2, body_
+    # the imported cichéto carries the hpkg's real summary, not the placeholder
+    man = c.get("/cicheto/repo.tap.helloapp").json()
+    assert man["summary"] == "test helloapp", man.get("summary")
+    print("import uses summary -> ok (real hpkg summary, not placeholder)")
     # the imported cichéto resolves live to the package URL
     res = c.get("/resolve/repo.tap.helloapp?channel=stable&arch=x86_64").json()
     assert res["source"] == "hpkr-repo"

@@ -1300,9 +1300,18 @@ def import_hpkr(request: Request, body: ImportHpkrBody,
     written = 0
     for p in packages:
         cid = f"repo.{_slug(body.bacaro)}.{_slug(p.name)}"
+        # Prefer the real summary the hpkg carries; fall back to the first line
+        # of the long description, then to a generic placeholder. Cap at the
+        # schema's summary limit so a long description cannot fail validation.
+        summary = p.summary
+        if not summary and p.description:
+            summary = p.description.splitlines()[0].strip()
+        if not summary:
+            summary = f"{p.name} from the {body.bacaro} repository"
+        summary = summary[:2000]
         data = {
             "cicheto": 1, "id": cid, "name": p.name,
-            "summary": f"{p.name} from the {body.bacaro} repository",
+            "summary": summary,
             "packager": {"name": body.bacaro, "bacaro": body.bacaro},
             "channels": {"stable": {
                 "version": p.version, "kind": "hpkg",

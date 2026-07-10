@@ -61,6 +61,8 @@ ENC_INT_64 = 3
 # PackageAttributes.h. (id, type) pairs:
 ATTR_PACKAGE = 54              # STRING  "package"            (per-package container)
 ATTR_PACKAGE_NAME = 15         # STRING  "package:name"
+ATTR_PACKAGE_SUMMARY = 16      # STRING  "package:summary"    (one-line)
+ATTR_PACKAGE_DESCRIPTION = 17  # STRING  "package:description" (long)
 ATTR_PACKAGE_ARCHITECTURE = 21  # UINT   "package:architecture" (enum code)
 ATTR_VERSION_MAJOR = 22        # STRING  "package:version.major"
 ATTR_VERSION_MINOR = 23        # STRING  "package:version.minor"
@@ -109,6 +111,8 @@ class RepoPackage:
     name: str
     version: str
     architecture: str
+    summary: str = ""       # package:summary from the hpkg, "" if absent
+    description: str = ""    # package:description from the hpkg, "" if absent
 
     def filename(self) -> str:
         return f"{self.name}-{self.version}-{self.architecture}.hpkg"
@@ -231,7 +235,8 @@ def _walk(r: _Reader, strings: list, on_package, depth: int = 0):
             _skip_children(r, strings, depth + 1)
 
 
-_WANTED = {ATTR_PACKAGE_NAME, ATTR_PACKAGE_ARCHITECTURE, ATTR_VERSION_MAJOR,
+_WANTED = {ATTR_PACKAGE_NAME, ATTR_PACKAGE_SUMMARY, ATTR_PACKAGE_DESCRIPTION,
+           ATTR_PACKAGE_ARCHITECTURE, ATTR_VERSION_MAJOR,
            ATTR_VERSION_MINOR, ATTR_VERSION_MICRO, ATTR_VERSION_REVISION}
 
 
@@ -375,8 +380,12 @@ def _parse_catalog_inner(blob: bytes) -> list:
             return
         arch_code = pkg.get(ATTR_PACKAGE_ARCHITECTURE, 0)
         arch = ARCH_NAMES[arch_code] if isinstance(arch_code, int) and arch_code < len(ARCH_NAMES) else "any"
+        summary = pkg.get(ATTR_PACKAGE_SUMMARY) or ""
+        description = pkg.get(ATTR_PACKAGE_DESCRIPTION) or ""
         packages.append(RepoPackage(name=name, version=_compose_version(pkg),
-                                    architecture=arch))
+                                    architecture=arch,
+                                    summary=str(summary).strip(),
+                                    description=str(description).strip()))
 
     _walk(r, strings, on_package)
     return packages
