@@ -51,8 +51,8 @@ from jose import JWTError, jwt
 from .config import check_prod_config
 from .db import get_session, init_db
 from .ingest import ingest_directory, ingest_git, list_bacari
-from .models import (Bacaro, CichetoRow, DownloadEvent, InstallState, User,
-                     dedup_key_for_name)
+from .models import (Bacaro, CichetoRow, DownloadEvent, InstallState,
+                     OmbraSnapshot, User, dedup_key_for_name)
 from .schemas import Cicheto, cicheto_to_yaml
 
 # Rate limiter keyed by client IP. In-memory by default; point storage_uri at
@@ -2016,9 +2016,9 @@ def health(session: Session = Depends(get_session)):
     return {"status": "ok", "version": "0.1.0"}
 
 
-@app.get("/stats")
-def stats(session: Session = Depends(get_session)):
-    """Catalog counts, for monitoring and to show the catalog growing."""
+def _stats_catalog(session: Session) -> dict:
+    """Catalog-shape counts. Safe to expose publicly: it describes the catalog,
+    never the people using it."""
     rows = session.exec(select(CichetoRow)).all()
     by_category: dict[str, int] = {}
     by_channel: dict[str, int] = {}
@@ -2035,17 +2035,143 @@ def stats(session: Session = Depends(get_session)):
         if r.haikuports:
             with_bridge += 1
 
-    distinct_bacari = len({r.bacaro for r in rows if r.bacaro})
-    users = len(session.exec(select(User.id)).all())
-    installs = len(session.exec(select(InstallState.id)).all())
-
     return {
         "cicheti": len(rows),
-        "bacari": distinct_bacari,
-        "users": users,
-        "library_entries": installs,
+        "bacari": len({r.bacaro for r in rows if r.bacaro}),
         "with_haikuports_bridge": with_bridge,
         "by_channel": dict(sorted(by_channel.items())),
         "by_category": dict(sorted(by_category.items(),
                                    key=lambda kv: (-kv[1], kv[0]))),
     }
+
+
+@app.get("/stats")
+def stats(session: Session = Depends(get_session)):
+    """Public catalog counts, for monitoring and to show the catalog growing.
+
+    Deliberately catalog-only. User counts, the install queue, and the download
+    log are operator data and live behind the admin gate at /admin/stats.
+    """
+    return _stats_catalog(session)
+
+
+def _count(session: Session, stmt) -> int:
+    """Scalar COUNT for a select(...) statement. Beats len(exec(...).all()):
+    the DB counts instead of the rows being materialized in Python."""
+    return session.exec(stmt).one()
+
+
+def _downloads_stats(session: Session, since_days: int = 30) -> dict:
+    """Aggregate the append-only DownloadEvent log over a trailing window.
+
+    `resolve` fires when the daemon asks where to fetch an app, `installed` when
+    it confirms the install landed, so `installed` is the honest number and the
+    gap between the two is the drop-off. Portable SQL (GROUP BY + count): SQLite
+    and Postgres alike.
+    """
+    since = datetime.utcnow() - timedelta(days=since_days)
+    recent = DownloadEvent.created_at >= since
+
+    def grouped(column) -> dict[str, int]:
+        stmt = (select(column, func.count(DownloadEvent.id))
+                .where(recent).group_by(column))
+        return {str(k): n for k, n in session.exec(stmt).all() if k}
+
+    top_stmt = (select(DownloadEvent.cicheto_id,
+                       func.count(DownloadEvent.id).label("n"))
+                .where(recent)
+                .group_by(DownloadEvent.cicheto_id)
+                .order_by(func.count(DownloadEvent.id).desc())
+                .limit(10))
+    ranked = session.exec(top_stmt).all()
+    # Name the apps in one query rather than one per row.
+    names = {r.id: r.name for r in session.exec(
+        select(CichetoRow).where(
+            CichetoRow.id.in_([cid for cid, _ in ranked]))).all()} if ranked else {}
+
+    return {
+        "window_days": since_days,
+        "total": _count(session, select(func.count(DownloadEvent.id)).where(recent)),
+        "all_time": _count(session, select(func.count(DownloadEvent.id))),
+        "by_kind": grouped(DownloadEvent.kind),
+        "by_channel": grouped(DownloadEvent.channel),
+        "by_arch": grouped(DownloadEvent.arch),
+        "top": [{"id": cid, "name": names.get(cid, cid), "downloads": n}
+                for cid, n in ranked],
+    }
+
+
+def _ombra_stats(session: Session) -> dict:
+    """Health of the ombra snapshot cache: how many apps resolve, and the ones
+    that do not (rate limit, missing asset, dead repo) with their error. These
+    are invisible anywhere else in the UI, and they are what silently breaks the
+    ombra channel."""
+    rows = session.exec(select(OmbraSnapshot)).all()
+    failing = [{"id": r.cicheto_id, "repo": r.repo, "error": r.error,
+                "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None}
+               for r in rows if r.error]
+    failing.sort(key=lambda d: d["id"])
+    stalest = min((r.resolved_at for r in rows if r.resolved_at), default=None)
+    return {
+        "snapshots": len(rows),
+        "ok": len(rows) - len(failing),
+        "errors": len(failing),
+        "oldest_snapshot": stalest.isoformat() if stalest else None,
+        "failing": failing,
+    }
+
+
+@app.get("/admin/stats", dependencies=[Depends(require_admin)])
+def admin_stats(session: Session = Depends(get_session)):
+    """Admin: everything the operator needs to see the registry is healthy.
+
+    The public /stats plus the parts that are nobody else's business: account
+    and library counts, the download log, which taps failed their last crawl,
+    and which ombra apps stopped resolving.
+
+    Note the two tap counts answer different questions and can legitimately
+    disagree: `catalog.bacari` is how many distinct taps the cached cichéti come
+    from, while `bacari.rows` is the crawl log, written only by POST /ingest. A
+    catalog seeded another way (a direct ingest_directory, a restored DB) shows
+    taps in the former and nothing in the latter.
+    """
+    now = datetime.utcnow()
+    month_ago = now - timedelta(days=30)
+
+    library = {state: _count(session, select(func.count(InstallState.id))
+                             .where(InstallState.state == state))
+               for state in ("pending", "installed", "removed")}
+
+    bacari = [{"slug": b.slug, "git_url": b.git_url,
+               "last_ingested_at": b.last_ingested_at.isoformat() if b.last_ingested_at else None,
+               "last_ingested": b.last_ingested, "last_removed": b.last_removed,
+               "last_error": b.last_error}
+              for b in sorted(session.exec(select(Bacaro)).all(),
+                              key=lambda b: b.slug)]
+
+    return {
+        "generated_at": now.isoformat(),
+        "catalog": _stats_catalog(session),
+        "users": {
+            "total": _count(session, select(func.count(User.id))),
+            "admins": _count(session, select(func.count(User.id))
+                             .where(User.is_admin == True)),  # noqa: E712
+            "last_30d": _count(session, select(func.count(User.id))
+                               .where(User.created_at >= month_ago)),
+        },
+        "library": {**library, "total": sum(library.values())},
+        "downloads": _downloads_stats(session),
+        "bacari": {"total": len(bacari),
+                   "failing": sum(1 for b in bacari if b["last_error"]),
+                   "rows": bacari},
+        "ombra": _ombra_stats(session),
+    }
+
+
+@app.get("/admin/stats-page", response_class=HTMLResponse,
+         include_in_schema=False)
+def admin_stats_page(request: Request):
+    """Admin statistics page. The page itself is a shell: the numbers are
+    fetched from /admin/stats, which is where the admin gate lives (same split
+    as /admin and its endpoints)."""
+    return render(request, "stats.html", {})

@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ t('stat.title') }} - spritz{% endblock %}
+
+{% block content %}
+<article class="app-detail">
+  <h1>{{ t('stat.title') }}</h1>
+  <p class="lead">{{ t('stat.lead') }}</p>
+
+  <section class="install">
+    <h2>X-Admin-Token</h2>
+    <p class="hint">{{ t('adm.need') }}</p>
+    <p>
+      <input type="password" id="admin-token" placeholder="X-Admin-Token"
+             class="field" style="max-width:520px;">
+    </p>
+    <p>
+      <button id="stats-btn" class="btn">{{ t('stat.load') }}</button>
+      <span class="hint" id="stats-status"></span>
+    </p>
+    <p><a href="/admin">{{ t('stat.back') }}</a></p>
+  </section>
+
+  <div id="stats-body" style="display:none;">
+    <section class="install">
+      <h2>{{ t('stat.catalog') }}</h2>
+      <table class="admin-table">
+        <tbody>
+          <tr><th>{{ t('stat.cicheti') }}</th><td id="s-cicheti">-</td></tr>
+          <tr><th>{{ t('stat.bacari') }}</th><td id="s-bacari">-</td></tr>
+          <tr><th>{{ t('stat.bridge') }}</th><td id="s-bridge">-</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="install">
+      <h2>{{ t('stat.users') }}</h2>
+      <table class="admin-table">
+        <tbody>
+          <tr><th>{{ t('stat.total') }}</th><td id="s-users">-</td></tr>
+          <tr><th>{{ t('stat.admins') }}</th><td id="s-admins">-</td></tr>
+          <tr><th>{{ t('stat.last30') }}</th><td id="s-users30">-</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="install">
+      <h2>{{ t('stat.library') }}</h2>
+      <table class="admin-table">
+        <tbody>
+          <tr><th>{{ t('stat.pending') }}</th><td id="s-pending">-</td></tr>
+          <tr><th>{{ t('stat.installed') }}</th><td id="s-installed">-</td></tr>
+          <tr><th>{{ t('stat.removed') }}</th><td id="s-removed">-</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="install">
+      <h2>{{ t('stat.downloads') }}</h2>
+      <p class="hint">{{ t('stat.dl_hint') }}</p>
+      <table class="admin-table">
+        <tbody>
+          <tr><th>{{ t('stat.total') }}</th><td id="s-dl-total">-</td></tr>
+          <tr><th>{{ t('stat.dl_alltime') }}</th><td id="s-dl-alltime">-</td></tr>
+          <tr><th>kind</th><td id="s-dl-kind">-</td></tr>
+          <tr><th>channel</th><td id="s-dl-channel">-</td></tr>
+          <tr><th>arch</th><td id="s-dl-arch">-</td></tr>
+        </tbody>
+      </table>
+
+      <h3>{{ t('stat.top_apps') }}</h3>
+      <table class="admin-table" id="s-top-table" style="display:none;">
+        <thead><tr><th>app</th><th>id</th><th>n</th></tr></thead>
+        <tbody id="s-top-body"></tbody>
+      </table>
+      <p class="empty" id="s-top-empty" style="display:none;">{{ t('stat.no_data') }}</p>
+    </section>
+
+    <section class="install">
+      <h2>{{ t('stat.bacari_health') }}</h2>
+      <p class="hint"><span id="s-bacari-summary"></span></p>
+      <table class="admin-table" id="s-bacari-table" style="display:none;">
+        <thead>
+          <tr><th>slug</th><th>{{ t('stat.last_crawl') }}</th><th>app</th><th>{{ t('stat.errors') }}</th></tr>
+        </thead>
+        <tbody id="s-bacari-body"></tbody>
+      </table>
+      <p class="empty" id="s-bacari-empty" style="display:none;">{{ t('stat.no_data') }}</p>
+    </section>
+
+    <section class="install">
+      <h2>{{ t('stat.ombra_health') }}</h2>
+      <p class="hint">{{ t('stat.ombra_hint') }}</p>
+      <p><span id="s-ombra-summary"></span></p>
+      <table class="admin-table" id="s-ombra-table" style="display:none;">
+        <thead><tr><th>id</th><th>repo</th><th>{{ t('stat.errors') }}</th></tr></thead>
+        <tbody id="s-ombra-body"></tbody>
+      </table>
+      <p class="empty" id="s-ombra-empty" style="display:none;">{{ t('stat.none') }}</p>
+    </section>
+  </div>
+</article>
+
+<div id="js-msgs" style="display:none"
+     data-m-need="{{ t('adm.need') }}"
+     data-m-badtoken="{{ t('adm.bad_token') }}"
+     data-m-disabled="{{ t('adm.disabled') }}"
+     data-m-error="{{ t('adm.error') }}"
+     data-m-loading="{{ t('stat.loading') }}"
+     data-m-done="{{ t('adm.done') }}"
+     data-m-ok="{{ t('stat.ok') }}"
+     data-m-errors="{{ t('stat.errors') }}"
+     data-m-nodata="{{ t('stat.no_data') }}"></div>
+<script src="/static/stats.js?v={{ asset_version }}"></script>
+{% endblock %}

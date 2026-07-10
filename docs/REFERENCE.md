@@ -40,6 +40,8 @@ Full interactive docs at `/docs`. Highlights:
 | POST | `/auth/register` · `/auth/login` | account (rate-limited) |
 | POST | `/library/{id}` · `/library/{id}/installed` | queue install / daemon confirm |
 | GET  | `/library/pending` | daemon polls |
+| GET  | `/stats` | public catalog counts (no user/library data) |
+| GET  | `/admin/stats` · `/admin/stats-page` | registry stats: users, downloads, taps, ombra (admin) |
 | POST | `/ingest` | crawl a bàcaro + auto-rebuild repo (admin) |
 | POST | `/repo/build` · `/repo/import-hpkr` | rebuild sub-repos / import third-party repo (admin) |
 | GET  | `/repo/{vendor}/{arch}/current/{repo.info,repo,packages/{file}}` | HaikuDepot |
